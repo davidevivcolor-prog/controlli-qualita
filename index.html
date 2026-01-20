@@ -331,6 +331,7 @@
                 <th>Lotto</th>
                 <th>Effettuato da</th>
                 <th class="right">Apri</th>
+                <th class="right">Elimina</th>
               </tr>
             </thead>
             <tbody id="allProductsBody"></tbody>
@@ -724,6 +725,8 @@ let currentCode = null;
 let cachedProduct = null;
 let workingControlsNew = null;
 let workingControlsEdit = null;
+let detailCheck = null;
+let detailOriginal = null;
 let lastReturnView = 'home';
 
 // Compat layer (keeps most of your code unchanged)
@@ -802,6 +805,18 @@ async function getAllByIndex(store, indexName, value){
   }
 
   throw new Error("Index non supportato: " + indexName);
+}
+
+
+async function deleteProductAndChecks(code){
+  // delete product doc
+  await deleteDoc(doc(fs, COL_PRODUCTS, code));
+  // delete all checks with that code (no orderBy -> no composite index required)
+  const qy = query(collection(fs, COL_CHECKS), where("code", "==", code));
+  const snap = await getDocs(qy);
+  for(const d of snap.docs){
+    await deleteDoc(doc(fs, COL_CHECKS, d.id));
+  }
 }
 
 async function wipeAllFirestore(){
@@ -954,6 +969,7 @@ async function renderAllProducts(){
       <td class="mono">${last ? esc(last.lotto ?? "") : ""}</td>
       <td class="mono">${last ? esc(last.meta?.effettuatoDa ?? "") : ""}</td>
       <td class="right"><button class="smallbtn secondary" data-openprod="${esc(p.code)}">Apri</button></td>
+      <td class="right"><button class="smallbtn danger" data-delprod="${esc(p.code)}">Elimina</button></td>
     `;
     body.appendChild(tr);
   }
@@ -962,6 +978,30 @@ async function renderAllProducts(){
     btn.addEventListener("click", async ()=>{
       const code = btn.getAttribute("data-openprod");
       await loadProduct(code);
+    });
+  });
+
+  body.querySelectorAll("button[data-delprod]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const code = btn.getAttribute("data-delprod");
+      if(!code) return;
+      const msg = `Eliminare il prodotto ${code} e TUTTI i suoi controlli? Operazione irreversibile.`;
+      if(!confirm(msg)) return;
+      try{
+        await deleteProductAndChecks(code);
+        // refresh lists
+        if(currentCode === code){
+          currentCode = null;
+          cachedProduct = null;
+          showView("home");
+        }
+        await refreshKPIs();
+        await renderHomeRecentProducts();
+        await renderAllProducts();
+      } catch(err){
+        console.error(err);
+        alert("Errore eliminazione prodotto: " + (err?.message || err));
+      }
     });
   });
 }
@@ -1107,6 +1147,7 @@ function renderLastChecks5(product, checks){
     <th>Prodotto da</th>
     <th>Effettuato da</th>
     <th class="right">Apri</th>
+    <th class="right">Elimina</th>
   `;
   headEl.appendChild(trh);
 
@@ -1139,6 +1180,7 @@ function renderLastChecks5(product, checks){
       <td class="mono">${esc(chk.meta?.prodottoDa ?? "")}</td>
       <td class="mono">${esc(chk.meta?.effettuatoDa ?? "")}</td>
       <td class="right"><button class="smallbtn secondary" data-open="${esc(chk.id)}">Apri</button></td>
+      <td class="right"><button class="smallbtn danger" data-delcheck="${esc(chk.id)}">Elimina</button></td>
     `;
     body.appendChild(tr);
   }
@@ -1595,6 +1637,7 @@ async function renderHistory(){
     <th>Prodotto da</th>
     <th>Effettuato da</th>
     <th class="right">Apri</th>
+    <th class="right">Elimina</th>
   `;
   head.appendChild(trh);
 
@@ -1616,7 +1659,7 @@ async function renderHistory(){
 
   if(checks.length===0){
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="${9 + controls.length}" class="muted">Nessun risultato con questi filtri.</td>`;
+    tr.innerHTML = `<td colspan="${10 + controls.length}" class="muted">Nessun risultato con questi filtri.</td>`;
     body.appendChild(tr);
     return;
   }
@@ -1643,6 +1686,7 @@ async function renderHistory(){
       <td class="mono">${esc(chk.meta?.prodottoDa ?? "")}</td>
       <td class="mono">${esc(chk.meta?.effettuatoDa ?? "")}</td>
       <td class="right"><button class="smallbtn secondary" data-open="${esc(chk.id)}">Apri</button></td>
+      <td class="right"><button class="smallbtn danger" data-delcheck="${esc(chk.id)}">Elimina</button></td>
     `;
     body.appendChild(tr);
   }
@@ -1651,6 +1695,23 @@ async function renderHistory(){
     btn.addEventListener("click", async ()=>{
       lastReturnView = "history";
       await openCheckDetailPage(btn.getAttribute("data-open"));
+    });
+  });
+
+  body.querySelectorAll("button[data-delcheck]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.getAttribute("data-delcheck");
+      if(!id) return;
+      if(!confirm("Eliminare questo controllo dallo storico? Operazione irreversibile.")) return;
+      try{
+        await deleteDoc(doc(fs, COL_CHECKS, id));
+        await refreshKPIs();
+        await renderHomeRecentProducts();
+        await renderHistory();
+      } catch(err){
+        console.error(err);
+        alert("Errore eliminazione controllo: " + (err?.message || err));
+      }
     });
   });
 }
