@@ -287,7 +287,7 @@
           </div>
         </div>
         <div class="muted" style="margin-top:10px; line-height:1.5;">
-          Scrivi un codice e premi <b>Apri</b>. Se registri un lotto gia usato, il sistema ti chiede conferma.
+          Scrivi un codice e premi <b>Apri</b>. Se registri un lotto già usato, il sistema ti chiede conferma.
         </div>
 
         <!-- MOVED HERE -->
@@ -302,7 +302,7 @@
         </div>
 
         <div class="muted">
-          Lotto e firma dell'ultimo controllo. Clicca per aprire la scheda prodotto.
+          Lotto e firma dell’ultimo controllo. Clicca per aprire la scheda prodotto.
         </div>
 
         <div id="homeRecentProducts" style="margin-top:12px"></div>
@@ -343,8 +343,8 @@
         <div class="topline">
           <div>
             <div class="muted">Scheda prodotto</div>
-            <div class="title" id="prodTitle">-</div>
-            <div class="muted" id="prodMeta">-</div>
+            <div class="title" id="prodTitle">—</div>
+            <div class="muted" id="prodMeta">—</div>
           </div>
           <div class="btns" style="margin-top:0">
             <button id="editSetupBtn">Setup controlli</button>
@@ -360,7 +360,7 @@
           <span class="tag">Sempre visibili</span>
         </div>
         <div class="controlCard">
-          <div class="muted" id="noteHint">-</div>
+          <div class="muted" id="noteHint">—</div>
           <div id="noteText" style="white-space:pre-wrap; margin-top:6px;"></div>
         </div>
 
@@ -377,7 +377,7 @@
                 <th>Controllo</th>
                 <th>Tipo</th>
                 <th>Spec</th>
-                <th>Unita</th>
+                <th>Unità</th>
                 <th class="right">Stato</th>
               </tr>
             </thead>
@@ -405,7 +405,7 @@
         <div class="topline">
           <div>
             <div class="muted">Nuovo prodotto</div>
-            <div class="title" id="newProdCode">-</div>
+            <div class="title" id="newProdCode">—</div>
           </div>
           <button id="cancelNewProdBtn">Annulla</button>
         </div>
@@ -437,7 +437,7 @@
         <div class="topline">
           <div>
             <div class="muted">Setup controlli</div>
-            <div class="title" id="setupTitle">-</div>
+            <div class="title" id="setupTitle">—</div>
           </div>
           <div class="btns" style="margin-top:0">
             <button id="setupBackBtn">Torna a scheda</button>
@@ -466,7 +466,7 @@
         <div class="topline">
           <div>
             <div class="muted">Nuovo controllo</div>
-            <div class="title" id="checkProdTitle">-</div>
+            <div class="title" id="checkProdTitle">—</div>
           </div>
           <button id="cancelCheckBtn">Annulla</button>
         </div>
@@ -539,7 +539,7 @@
         <div class="topline">
           <div>
             <div class="muted">Storico controlli</div>
-            <div class="title" id="histTitle">-</div>
+            <div class="title" id="histTitle">—</div>
           </div>
           <div class="btns" style="margin-top:0">
             <button id="backToProdBtn">Torna a scheda</button>
@@ -579,8 +579,8 @@
         <div class="topline">
           <div>
             <div class="muted">Dettaglio controllo</div>
-            <div class="title" id="detailTitle">-</div>
-            <div class="muted" id="detailMeta">-</div>
+            <div class="title" id="detailTitle">—</div>
+            <div class="muted" id="detailMeta">—</div>
           </div>
           <div class="btns" style="margin-top:0">
             <button id="detailBackBtn">Indietro</button>
@@ -654,17 +654,22 @@
   </div>
 </div>
 
+<script>
+// Shim for libraries that expect Node-style process/env
+window.process = window.process || { env: { NODE_ENV: "production" } };
+window.global = window.global || window;
+</script>
 <script type="module">
 
 /* =========================
    DEFAULT CONTROLS
 ========================= */
 const DEFAULT_CONTROLS = [
-  { key:"viscosita",     name:"Viscosita",      type:"num_minmax", unit:"cP",       enabled:true, spec:{min:null,max:null}, extra:{} },
-  { key:"macinazione",   name:"Macinazione",    type:"num_max",    unit:"um",       enabled:true, spec:{max:null},          extra:{} },
+  { key:"viscosita",     name:"Viscosità",      type:"num_minmax", unit:"cP",       enabled:true, spec:{min:null,max:null}, extra:{} },
+  { key:"macinazione",   name:"Macinazione",    type:"num_max",    unit:"µm",       enabled:true, spec:{max:null},          extra:{} },
   { key:"brillantezza",  name:"Brillantezza",   type:"num_minmax", unit:"gloss",    enabled:true, spec:{min:null,max:null}, extra:{ thickness_um:null } },
   { key:"peso_spec",     name:"Peso specifico", type:"num_minmax", unit:"Kg/L",     enabled:true, spec:{min:null,max:null}, extra:{} },
-  { key:"conducibilita", name:"Conducibilita",  type:"num_minmax", unit:"MOhm*cm",  enabled:true, spec:{min:null,max:null}, extra:{} },
+  { key:"conducibilita", name:"Conducibilità",  type:"num_minmax", unit:"MOhm*cm",  enabled:true, spec:{min:null,max:null}, extra:{} },
   { key:"ph",            name:"pH",             type:"num_minmax", unit:"",         enabled:true, spec:{min:null,max:null}, extra:{} }
 ];
 const CHECK_ENTRY_ORDER = ["viscosita","macinazione","brillantezza","peso_spec","conducibilita","ph"];
@@ -900,7 +905,7 @@ async function renderHomeRecentProducts(){
     card.innerHTML = `
       <div class="topline" style="align-items:center">
         <div>
-          <div style="font-weight:950">${esc(r.code)} - ${esc(r.name)}</div>
+          <div style="font-weight:950">${esc(r.code)} — ${esc(r.name)}</div>
           <div class="muted">Ultimo: ${esc(fmtDateTime(r.dateISO))} • Lotto: <span class="mono">${esc(r.lotto)}</span> • Da: <span class="mono">${esc(r.by)}</span></div>
         </div>
         <button class="smallbtn secondary" data-openprod="${esc(r.code)}">Apri</button>
@@ -968,10 +973,10 @@ function controlTypeLabel(c){
   if(c.type==="num_minmax") return "Numerico (min/max)";
   if(c.type==="num_max") return "Numerico (solo max)";
   if(c.type==="text") return "Testo";
-  return "-";
+  return "—";
 }
 function describeSpec(c){
-  if(!c.enabled) return "-";
+  if(!c.enabled) return "—";
   if(c.type === "text") return "Testo";
   if(c.type === "num_max"){
     const mx = c.spec?.max;
@@ -984,7 +989,7 @@ function describeSpec(c){
     if(mn!=null) return `≥ ${mn}`;
     return `≤ ${mx}`;
   }
-  return "-";
+  return "—";
 }
 function getControlByKey(controls, key){ return (controls||[]).find(c=>c.key===key) || null; }
 function hasSpecToRequest(c){
@@ -1058,7 +1063,7 @@ function lastModText(check, key){
   const mods = check.modifications?.[key];
   if(!Array.isArray(mods) || mods.length===0) return "";
   const last = mods[mods.length-1];
-  return `Modificato il ${fmtDateTime(last.at)} - prima: ${last.old ?? ""} → ora: ${last.new ?? ""}`;
+  return `Modificato il ${fmtDateTime(last.at)} — prima: ${last.old ?? ""} → ora: ${last.new ?? ""}`;
 }
 
 /* =========================
@@ -1074,7 +1079,7 @@ function renderStdTable(controls){
     tr.innerHTML = `
       <td><b>${esc(c.name)}</b></td>
       <td>${esc(controlTypeLabel(c))}</td>
-      <td>${esc(describeSpec(c))}${c.key==="brillantezza" && c.enabled ? (c.extra?.thickness_um ? ` • a ${esc(c.extra.thickness_um)} um` : " • a (vuoto) um") : ""}</td>
+      <td>${esc(describeSpec(c))}${c.key==="brillantezza" && c.enabled ? (c.extra?.thickness_um ? ` • a ${esc(c.extra.thickness_um)} µm` : " • a (vuoto) µm") : ""}</td>
       <td>${esc(c.unit ?? "")}</td>
       <td class="right"><span class="tag">${esc(status)}</span></td>
     `;
@@ -1166,7 +1171,7 @@ async function loadProduct(rawCode){
   currentCode = code;
   cachedProduct = p;
 
-  document.getElementById("prodTitle").textContent = `${p.code} - ${p.name}`;
+  document.getElementById("prodTitle").textContent = `${p.code} — ${p.name}`;
   document.getElementById("prodMeta").textContent = `Creato: ${fmtDateTime(p.createdAtISO)}`;
 
   document.getElementById("noteHint").textContent = p.noteOperative?.trim() ? "" : "Nessuna nota impostata.";
@@ -1205,7 +1210,7 @@ function buildSpecEditorHtml(c){
   const extra = (c.key==="brillantezza") ? `
     <div class="row2" style="margin-top:10px">
       <div>
-        <label>Brillantezza misurata a (um)</label>
+        <label>Brillantezza misurata a (µm)</label>
         <input data-extra="${k}|thickness_um" type="number" step="any" value="${c.extra?.thickness_um ?? ""}" placeholder="Es. 60" />
       </div>
     </div>
@@ -1258,9 +1263,9 @@ function renderSetupControls(mode){
 
       <div class="row2" style="margin-top:10px">
         <div>
-          <label>Unita di misura</label>
+          <label>Unità di misura</label>
           <input data-unit="${esc(c.key)}" value="${esc(c.unit ?? "")}" ${c.key==="macinazione" ? "disabled" : ""} />
-          <div class="muted">${c.key==="macinazione" ? "Macinazione: unita fissa um." : ""}</div>
+          <div class="muted">${c.key==="macinazione" ? "Macinazione: unità fissa µm." : ""}</div>
         </div>
       </div>
 
@@ -1284,7 +1289,7 @@ function renderSetupControls(mode){
       const k = btn.getAttribute("data-delete");
       const idx = working.findIndex(x=>x.key===k);
       if(idx<0) return;
-      if(!confirm(`Eliminare il controllo "${working[idx].name}"? Non comparira piu per questo prodotto.`)) return;
+      if(!confirm(`Eliminare il controllo "${working[idx].name}"? Non comparirà più per questo prodotto.`)) return;
       working.splice(idx,1);
       renderSetupControls(mode);
     });
@@ -1331,7 +1336,7 @@ function renderSetupControls(mode){
 
 function addCustomControl(mode){
   const working = (mode==="new") ? workingControlsNew : workingControlsEdit;
-  const name = prompt("Nome nuovo controllo (es. Temperatura, Umidita, ecc.)");
+  const name = prompt("Nome nuovo controllo (es. Temperatura, Umidità, ecc.)");
   if(!name) return;
   const type = prompt('Tipo controllo:\n1 = Numerico (min/max)\n2 = Numerico (solo max)\n3 = Testo\n\nScrivi 1/2/3');
   if(!type) return;
@@ -1340,7 +1345,7 @@ function addCustomControl(mode){
   else if(type.trim()==="2") t="num_max";
   else if(type.trim()==="3") t="text";
   else return alert("Valore non valido.");
-  const unit = (t==="text") ? "" : (prompt("Unita di misura (opz.)") ?? "");
+  const unit = (t==="text") ? "" : (prompt("Unità di misura (opz.)") ?? "");
   const key = "custom_" + uuid().slice(3).replaceAll("-","");
   working.push({
     key, name: name.trim(), type: t, unit: unit.trim(),
@@ -1361,7 +1366,7 @@ async function saveNewProduct(){
   const noteOperative = document.getElementById("newProdNOTE").value ?? "";
 
   for(const c of workingControlsNew){
-    if(c.key==="macinazione"){ c.unit="um"; c.type="num_max"; c.spec = {max: c.spec?.max ?? null}; }
+    if(c.key==="macinazione"){ c.unit="µm"; c.type="num_max"; c.spec = {max: c.spec?.max ?? null}; }
     if(c.key==="ph"){ c.unit=""; }
     if(c.key==="brillantezza"){ c.unit="gloss"; }
     if(c.key==="conducibilita"){ c.unit="MOhm*cm"; }
@@ -1380,7 +1385,7 @@ async function saveNewProduct(){
 async function openSetup(){
   const p = cachedProduct;
   workingControlsEdit = deepClone(p.controls || deepClone(DEFAULT_CONTROLS));
-  document.getElementById("setupTitle").textContent = `${p.code} - ${p.name}`;
+  document.getElementById("setupTitle").textContent = `${p.code} — ${p.name}`;
   document.getElementById("setupNOTE").value = p.noteOperative ?? "";
   renderSetupControls("edit");
   showView("setup");
@@ -1391,7 +1396,7 @@ async function saveSetup(){
   if(!p) return;
 
   for(const c of workingControlsEdit){
-    if(c.key==="macinazione"){ c.unit="um"; c.type="num_max"; c.spec = {max: c.spec?.max ?? null}; }
+    if(c.key==="macinazione"){ c.unit="µm"; c.type="num_max"; c.spec = {max: c.spec?.max ?? null}; }
     if(c.key==="ph"){ c.unit=""; }
     if(c.key==="brillantezza"){ c.unit="gloss"; }
     if(c.key==="conducibilita"){ c.unit="MOhm*cm"; }
@@ -1414,7 +1419,7 @@ async function startNewCheck(){
   const p = cachedProduct;
   if(!p) return;
 
-  document.getElementById("checkProdTitle").textContent = `${p.code} - ${p.name}`;
+  document.getElementById("checkProdTitle").textContent = `${p.code} — ${p.name}`;
   document.getElementById("checkDate").value = nowLocalDatetimeValue();
   document.getElementById("checkLotto").value = "";
 
@@ -1442,15 +1447,15 @@ async function startNewCheck(){
 
     const spec = specText(c);
     const extraLine = (c.key==="brillantezza")
-      ? `<div class="muted">Misurata a: <b>${esc(c.extra?.thickness_um ?? "(vuoto)")}</b> um</div>`
+      ? `<div class="muted">Misurata a: <b>${esc(c.extra?.thickness_um ?? "(vuoto)")}</b> µm</div>`
       : "";
 
     const viscosityNoteField = (c.key==="viscosita")
       ? `
         <div class="row2" style="margin-top:10px">
           <div>
-            <label>Note viscosita (es. 20/30°C, R4...)</label>
-            <input data-viscnote="1" placeholder="Scrivi note viscosita..." />
+            <label>Note viscosità (es. 20/30°C, R4...)</label>
+            <input data-viscnote="1" placeholder="Scrivi note viscosità..." />
           </div>
         </div>
       ` : "";
@@ -1468,7 +1473,7 @@ async function startNewCheck(){
         </div>
         <div>
           <label>Esito</label>
-          <input data-out="${esc(c.key)}" value="-" disabled />
+          <input data-out="${esc(c.key)}" value="—" disabled />
         </div>
       </div>
       ${viscosityNoteField}
@@ -1480,7 +1485,7 @@ async function startNewCheck(){
 
     inp.addEventListener("input", ()=>{
       const v = toNumber(inp.value);
-      if(v===null){ out.value="-"; return; }
+      if(v===null){ out.value="—"; return; }
       const ok = evaluateValueAgainstSpec(c, v);
       out.value = ok ? "OK" : "Fuori STD";
     });
@@ -1503,7 +1508,7 @@ async function confirmDuplicateLottoIfNeeded(lotto, ignoreCheckId=null){
 
   const preview = filtered.slice(0,5).map(c=> `- ${c.code} • ${fmtDateTime(c.dateISO)} • da ${c.meta?.effettuatoDa ?? ""}`).join("\n");
   return confirm(
-`ATTENZIONE: lotto "${lotto}" gia usato in ${filtered.length} controllo/i.\n\nEsempi:\n${preview}\n\nVuoi salvare comunque?`
+`ATTENZIONE: lotto "${lotto}" già usato in ${filtered.length} controllo/i.\n\nEsempi:\n${preview}\n\nVuoi salvare comunque?`
   );
 }
 
@@ -1515,7 +1520,7 @@ async function saveCheck(){
   const dateISO = new Date(dateLocal).toISOString();
 
   const lotto = document.getElementById("checkLotto").value.trim();
-  if(!lotto) return alert("Il lotto e obbligatorio.");
+  if(!lotto) return alert("Il lotto è obbligatorio.");
 
   const okDup = await confirmDuplicateLottoIfNeeded(lotto);
   if(!okDup) return;
@@ -1670,7 +1675,7 @@ function computeChanged(){
   return JSON.stringify(detailCheck) !== JSON.stringify(detailOriginal);
 }
 function updateDetailTitle(){
-  const base = `${detailCheck.code} - controllo`;
+  const base = `${detailCheck.code} — controllo`;
   document.getElementById("detailTitle").textContent = computeChanged() ? (base + " *") : base;
 }
 
@@ -1753,7 +1758,7 @@ async function openCheckDetailPage(checkId){
       ${ctrl.key==="viscosita" ? `
         <div class="row2" style="margin-top:10px">
           <div>
-            <label>Note viscosita</label>
+            <label>Note viscosità</label>
             <input id="detailViscNote" placeholder="Es. 20/30°C, R4..." />
           </div>
         </div>
@@ -1766,14 +1771,14 @@ async function openCheckDetailPage(checkId){
 
     const orig = detailOriginal.results.find(x=>x.key===ctrl.key);
     valEl.value = (r.value ?? "");
-    outEl.value = (r.ok===true) ? "OK" : (r.ok===false ? "Fuori STD" : "-");
+    outEl.value = (r.ok===true) ? "OK" : (r.ok===false ? "Fuori STD" : "—");
 
     valEl.oninput = () => {
       const v = toNumber(valEl.value);
       if(v===null){
         r.value = null;
         r.ok = null;
-        outEl.value = "-";
+        outEl.value = "—";
         setStar(valEl, String(valEl.value) !== String(orig?.value ?? ""));
         updateDetailTitle();
         return;
@@ -1831,7 +1836,7 @@ async function saveDetail(){
   if(!detailCheck) return;
 
   const lotto = String(detailCheck.lotto ?? "").trim();
-  if(!lotto) return alert("Il lotto e obbligatorio.");
+  if(!lotto) return alert("Il lotto è obbligatorio.");
 
   const okDup = await confirmDuplicateLottoIfNeeded(lotto, detailCheck.id);
   if(!okDup) return;
@@ -1879,7 +1884,7 @@ async function exportChecksCSV(checks, filename){
   const baseCols = ["Codice","Data","Lotto","Esito"];
   const ctrlValCols = controls.map(c=>`VAL_${c.name}`);
   const ctrlModCols = controls.map(c=>`MOD_${c.name}`);
-  const metaCols = ["Note viscosita","Aggiunte","Note","Prodotto da","Effettuato da"];
+  const metaCols = ["Note viscosità","Aggiunte","Note","Prodotto da","Effettuato da"];
 
   const cols = [...baseCols, ...ctrlValCols, ...ctrlModCols, ...metaCols];
   let csv = cols.map(csvEscape).join(";") + "\n";
@@ -1975,7 +1980,7 @@ document.getElementById("saveCheckBtn").addEventListener("click", saveCheck);
 
 document.getElementById("historyBtn").addEventListener("click", async ()=>{
   if(!cachedProduct) return;
-  document.getElementById("histTitle").textContent = `${cachedProduct.code} - ${cachedProduct.name}`;
+  document.getElementById("histTitle").textContent = `${cachedProduct.code} — ${cachedProduct.name}`;
   document.getElementById("filterOutcome").value = "all";
   document.getElementById("filterFrom").value = "";
   document.getElementById("filterTo").value = "";
