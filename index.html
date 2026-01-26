@@ -660,20 +660,29 @@
 window.process = window.process || { env: { NODE_ENV: "production" } };
 window.global = window.global || window;
 </script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script type="module">
 
 /* =========================
    DEFAULT CONTROLS
 ========================= */
 const DEFAULT_CONTROLS = [
-  { key:"viscosita",     name:"Viscosità",      type:"num_minmax", unit:"cP",       enabled:true, spec:{min:null,max:null}, extra:{} },
-  { key:"macinazione",   name:"Macinazione",    type:"num_max",    unit:"µm",       enabled:true, spec:{max:null},          extra:{} },
-  { key:"brillantezza",  name:"Brillantezza",   type:"num_minmax", unit:"gloss",    enabled:true, spec:{min:null,max:null}, extra:{ thickness_um:null } },
-  { key:"peso_spec",     name:"Peso specifico", type:"num_minmax", unit:"Kg/L",     enabled:true, spec:{min:null,max:null}, extra:{} },
-  { key:"conducibilita", name:"Conducibilità",  type:"num_minmax", unit:"MOhm*cm",  enabled:true, spec:{min:null,max:null}, extra:{} },
-  { key:"ph",            name:"pH",             type:"num_minmax", unit:"",         enabled:true, spec:{min:null,max:null}, extra:{} }
+  { key:"viscosita",     name:"Viscosità",      type:"num_minmax", unit:"cP",       enabled:true,  spec:{min:null,max:null}, extra:{} },
+  { key:"macinazione",   name:"Macinazione",    type:"num_max",    unit:"µm",       enabled:true,  spec:{max:null},          extra:{} },
+  { key:"brillantezza",  name:"Brillantezza",   type:"num_minmax", unit:"gloss",    enabled:false, spec:{min:null,max:null}, extra:{ thickness_um:null } },
+  { key:"peso_spec",     name:"Peso specifico", type:"num_minmax", unit:"Kg/L",     enabled:true,  spec:{min:null,max:null}, extra:{} },
+
+  // Nuovi controlli (di base disattivi)
+  { key:"deltae",        name:"ΔE",             type:"num_max",    unit:"ΔE",       enabled:false, spec:{max:null},          extra:{ allowPdf:true } },
+
+  { key:"conducibilita", name:"Conducibilità",  type:"num_minmax", unit:"MOhm*cm",  enabled:false, spec:{min:null,max:null}, extra:{} },
+  { key:"ph",            name:"pH",             type:"num_minmax", unit:"",         enabled:false, spec:{min:null,max:null}, extra:{} },
+
+  // Resa sempre dopo pH (di base disattiva)
+  { key:"resa",          name:"Resa %",          type:"num_minmax", unit:"%",        enabled:false, spec:{min:null,max:null}, extra:{ allowPdf:true } }
 ];
-const CHECK_ENTRY_ORDER = ["viscosita","macinazione","brillantezza","peso_spec","conducibilita","ph"];
+const CHECK_ENTRY_ORDER = ["viscosita","macinazione","brillantezza","peso_spec","ph","resa","deltae","conducibilita"];
 
 /* =========================
    Firebase (Firestore)
@@ -852,6 +861,220 @@ function downloadText(filename, text){
   a.href=URL.createObjectURL(blob); a.download=filename;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(a.href);
+
+/* =========================
+   PDF: Certificazioni ΔE / Resa
+========================= */
+
+// Logo VivColor (inline SVG). Se vuoi sostituirlo con il logo ufficiale, basta rimpiazzare questa dataURL.
+const VIVCOLOR_LOGO_DATA_URL = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="120" viewBox="0 0 420 120">
+  <rect width="420" height="120" fill="white"/>
+  <text x="18" y="78" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="64" fill="#d10f1a">VIV</text>
+  <text x="150" y="78" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="64" fill="#111827">COLOR</text>
+</svg>`);
+
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = reader.result; // data:...;base64,XXXX
+      const b64 = String(res).split(",")[1] || "";
+      resolve(b64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+function base64ToUint8Array(b64){
+  const bin = atob(b64 || "");
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+function downloadBytes(filename, bytes, mime="application/pdf"){
+  const blob = new Blob([bytes], { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+function pdfSafe(s){ return String(s ?? "").replaceAll("\r","").trim(); }
+
+function certFilename(prefix, code, lotto){
+  const safeCode = normalizeCode(code).replaceAll(" ", "");
+  const safeLotto = String(lotto ?? "").replaceAll(" ", "_");
+  return `${prefix}_${safeCode}_LOTTO_${safeLotto}.pdf`;
+}
+
+async function buildCertificatePdfBytes({ kind, product, check, result, specLabel }){
+  const { jsPDF } = window.jspdf;
+
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const margin = 14;
+  const pageW = doc.internal.pageSize.getWidth();
+  const y0 = 14;
+
+  try{ doc.addImage(VIVCOLOR_LOGO_DATA_URL, "PNG", margin, y0, 46, 13); } catch(_) {}
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("VIVCOLOR S.R.L.", margin + 52, y0 + 5);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text("Laboratorio Ricerca & Sviluppo", margin + 52, y0 + 10);
+  doc.text("Certificazione di Controllo Qualità", margin + 52, y0 + 15);
+
+  doc.setDrawColor(231,231,231);
+  doc.line(margin, y0 + 20, pageW - margin, y0 + 20);
+
+  const pLineY = y0 + 30;
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("Prodotto:", margin, pLineY);
+  doc.setFont("helvetica", "normal");
+  doc.text(pdfSafe(product?.name), margin + 22, pLineY);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Codice:", margin, pLineY + 6);
+  doc.setFont("helvetica", "normal");
+  doc.text(pdfSafe(product?.code), margin + 22, pLineY + 6);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Lotto:", margin, pLineY + 12);
+  doc.setFont("helvetica", "normal");
+  doc.text(pdfSafe(check?.lotto), margin + 22, pLineY + 12);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Data controllo:", margin, pLineY + 18);
+  doc.setFont("helvetica", "normal");
+  doc.text(pdfSafe(fmtDateTime(check?.dateISO)), margin + 30, pLineY + 18);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Operatore:", margin, pLineY + 24);
+  doc.setFont("helvetica", "normal");
+  doc.text(pdfSafe(check?.meta?.effettuatoDa), margin + 25, pLineY + 24);
+
+  doc.setDrawColor(231,231,231);
+  doc.line(margin, pLineY + 30, pageW - margin, pLineY + 30);
+
+  let y = pLineY + 40;
+
+  function writePara(txt){
+    const lines = doc.splitTextToSize(txt, pageW - margin*2);
+    doc.text(lines, margin, y);
+    y += lines.length * 5.2 + 2;
+  }
+
+  if(kind === "deltae"){
+    doc.setFont("helvetica","bold"); doc.setFontSize(13);
+    doc.text("CERTIFICAZIONE DI CONTROLLO COLORE (ΔE)", margin, y); y += 8;
+
+    doc.setFont("helvetica","normal"); doc.setFontSize(10);
+
+    writePara("Il presente documento attesta l’esecuzione del controllo colore mediante determinazione del valore ΔE sul prodotto indicato.");
+    writePara("La prova è stata eseguita dal Laboratorio VivColor secondo procedure interne del laboratorio, che prevedono l’applicazione del prodotto a spruzzo, con diluizione standard, fino a copertura uniforme ed essiccazione completa del film.");
+    writePara("La misurazione è stata effettuata secondo lo spazio colore CIELAB, con geometria di misura 8 mm e illuminante D65, mediante spettrofotometro YS6020.");
+    writePara("Strumento di misura: Spettrofotometro YS6020 – Codice interno LAB.29");
+    writePara("Il valore di ΔE rilevato, che rappresenta lo scostamento cromatico del campione analizzato rispetto allo standard di riferimento, risulta pari a:");
+
+    doc.setFont("helvetica","bold");
+    doc.text(`ΔE rilevato: ${result?.value ?? ""}`, margin, y); y += 8;
+
+    doc.setFont("helvetica","normal");
+    writePara("Il controllo è da considerarsi conforme qualora il valore di ΔE rilevato risulti uguale o inferiore al limite di accettazione previsto, definito in funzione delle specifiche di prodotto e/o delle richieste del cliente:");
+
+    doc.setFont("helvetica","bold");
+    doc.text(`Limite di accettazione ΔE: ${specLabel ?? ""}`, margin, y); y += 8;
+
+    doc.setFont("helvetica","normal");
+    writePara("Eventuale documentazione strumentale, report di misura o materiale di supporto allegati costituiscono parte integrante della presente certificazione.");
+
+  } else if(kind === "resa"){
+    doc.setFont("helvetica","bold"); doc.setFontSize(13);
+    doc.text("CERTIFICAZIONE DI CONTROLLO RESA (%)", margin, y); y += 8;
+
+    doc.setFont("helvetica","normal"); doc.setFontSize(10);
+
+    writePara("Il presente documento attesta l’esecuzione del controllo di resa percentuale sul prodotto indicato.");
+    writePara("Il controllo è stato effettuato dal Laboratorio VivColor secondo procedure interne del laboratorio, applicabili esclusivamente alle paste coloranti.");
+    writePara("Il valore di resa percentuale rappresenta il rendimento del prodotto rispetto allo standard di riferimento, determinato in base alle condizioni di prova definite.");
+
+    doc.setFont("helvetica","bold"); doc.text("Procedura di prova (sintesi)", margin, y); y += 6;
+    doc.setFont("helvetica","normal");
+    writePara("La prova di resa viene eseguita mediante preparazione di una miscela a peso noto costituita da convertitore e paste, secondo rapporti percentuali prestabiliti.");
+    writePara("Le quantità dei componenti vengono pesate con elevata precisione e registrate per garantire la tracciabilità della prova. La miscela ottenuta viene omogeneizzata, successivamente diluita in funzione delle condizioni ambientali e applicata a spruzzo su supporto idoneo fino a copertura completa.");
+
+    doc.setFont("helvetica","bold"); doc.text("Misurazione", margin, y); y += 6;
+    doc.setFont("helvetica","normal");
+    writePara("La valutazione della resa percentuale è effettuata utilizzando spettrofotometro YS6020.");
+    writePara("Strumento di misura: Spettrofotometro YS6020 – Codice interno LAB.29");
+
+    doc.setFont("helvetica","bold"); doc.text("Risultati", margin, y); y += 6;
+    doc.setFont("helvetica","bold");
+    doc.text(`Resa (%) rilevata: ${result?.value ?? ""}`, margin, y); y += 8;
+
+    doc.setFont("helvetica","normal");
+    writePara("Il controllo è da considerarsi conforme qualora il valore rilevato rientri nel seguente intervallo di accettazione:");
+
+    doc.setFont("helvetica","bold");
+    doc.text(`Intervallo di accettazione (Standard): ${specLabel ?? ""}`, margin, y); y += 8;
+
+    doc.setFont("helvetica","normal");
+    writePara("Eventuale documentazione tecnica o report di prova allegati costituiscono parte integrante della presente certificazione.");
+  }
+
+  y += 6;
+  doc.setDrawColor(231,231,231);
+  doc.line(margin, y, pageW - margin, y);
+  y += 10;
+
+  doc.setFont("helvetica","normal");
+  doc.text("Firma operatore controllo:", margin, y);
+  doc.setFont("helvetica","bold");
+  doc.text(pdfSafe(check?.meta?.effettuatoDa), margin + 48, y);
+  y += 6;
+
+  doc.setFont("helvetica","normal");
+  doc.text("Data:", margin, y);
+  doc.text(pdfSafe(fmtDateTime(check?.dateISO)), margin + 12, y);
+
+  return doc.output("arraybuffer");
+}
+
+async function buildMergedCertificatePdf({ kind, product, check, result, specLabel }){
+  const certBytes = await buildCertificatePdfBytes({ kind, product, check, result, specLabel });
+
+  const attachB64 = result?.attachmentB64;
+  if(!attachB64){
+    return new Uint8Array(certBytes);
+  }
+
+  const { PDFDocument } = window.PDFLib;
+
+  const merged = await PDFDocument.create();
+  const certDoc = await PDFDocument.load(certBytes);
+  const certPages = await merged.copyPages(certDoc, certDoc.getPageIndices());
+  certPages.forEach(p=>merged.addPage(p));
+
+  try{
+    const attBytes = base64ToUint8Array(attachB64);
+    const attDoc = await PDFDocument.load(attBytes);
+    const attPages = await merged.copyPages(attDoc, attDoc.getPageIndices());
+    attPages.forEach(p=>merged.addPage(p));
+  } catch(err){
+    console.warn("Allegato PDF non unibile:", err);
+  }
+
+  const out = await merged.save();
+  return out;
+}
+
 }
 
 /* =========================
@@ -1413,6 +1636,8 @@ async function saveNewProduct(){
     if(c.key==="brillantezza"){ c.unit="gloss"; }
     if(c.key==="conducibilita"){ c.unit="MOhm*cm"; }
     if(c.key==="peso_spec"){ c.unit="Kg/L"; }
+    if(c.key==="deltae"){ c.unit="ΔE"; c.type="num_max"; c.spec = {max: c.spec?.max ?? null}; }
+    if(c.key==="resa"){ c.unit="%"; c.type="num_minmax"; c.spec = {min: c.spec?.min ?? null, max: c.spec?.max ?? null}; }
   }
 
   const p = { code, name, createdAtISO: new Date().toISOString(), noteOperative, controls: workingControlsNew };
@@ -1443,6 +1668,8 @@ async function saveSetup(){
     if(c.key==="brillantezza"){ c.unit="gloss"; }
     if(c.key==="conducibilita"){ c.unit="MOhm*cm"; }
     if(c.key==="peso_spec"){ c.unit="Kg/L"; }
+    if(c.key==="deltae"){ c.unit="ΔE"; c.type="num_max"; c.spec = {max: c.spec?.max ?? null}; }
+    if(c.key==="resa"){ c.unit="%"; c.type="num_minmax"; c.spec = {min: c.spec?.min ?? null, max: c.spec?.max ?? null}; }
   }
 
   p.noteOperative = document.getElementById("setupNOTE").value ?? "";
@@ -1502,6 +1729,17 @@ async function startNewCheck(){
         </div>
       ` : "";
 
+    const attachmentField = (c.key==="deltae" || c.key==="resa")
+      ? `
+        <div class="row2" style="margin-top:10px">
+          <div>
+            <label>Allega PDF (opzionale)</label>
+            <input data-file="${esc(c.key)}" type="file" accept="application/pdf,.pdf" />
+            <div class="muted">Se alleghi un PDF, verrà unito alla certificazione scaricabile.</div>
+          </div>
+        </div>
+      ` : "";
+
     card.innerHTML = `
       <div class="controlTitle">
         <div><b>${esc(c.name)}</b> <span class="tag">${esc(c.unit || "-")}</span></div>
@@ -1518,6 +1756,7 @@ async function startNewCheck(){
           <input data-out="${esc(c.key)}" value="—" disabled />
         </div>
       </div>
+      ${attachmentField}
       ${viscosityNoteField}
     `;
     container.appendChild(card);
@@ -1591,7 +1830,19 @@ async function saveCheck(){
     const ok = evaluateValueAgainstSpec(c, v);
     if(!ok) anyOut = true;
 
-    results.push({ key:c.key, name:c.name, value:v, unit:c.unit ?? "", ok, specText: specText(c) });
+    // Allegati PDF (solo ΔE / Resa)
+    let attachmentName = null;
+    let attachmentB64 = null;
+    if(c.key==="deltae" || c.key==="resa"){
+      const fInp = document.querySelector(`#checkRows input[type="file"][data-file="${CSS.escape(c.key)}"]`);
+      const file = fInp?.files?.[0] || null;
+      if(file){
+        attachmentName = file.name || "allegato.pdf";
+        attachmentB64 = await fileToBase64(file);
+      }
+    }
+
+    results.push({ key:c.key, name:c.name, value:v, unit:c.unit ?? "", ok, specText: specText(c), attachmentName, attachmentB64 });
   }
 
   const check = {
@@ -1816,6 +2067,24 @@ async function openCheckDetailPage(checkId){
         </div>
       </div>
 
+      ${(ctrl.key==="deltae" || ctrl.key==="resa") ? `
+        <div class="row2" style="margin-top:10px">
+          <div>
+            <label>Allega / sostituisci PDF (opzionale)</label>
+            <input data-detail-file="${esc(ctrl.key)}" type="file" accept="application/pdf,.pdf" />
+            <div class="muted">${r?.attachmentName ? `Allegato attuale: <b>${esc(r.attachmentName)}</b>` : "Nessun allegato."}</div>
+          </div>
+          <div>
+            <label>PDF certificazione</label>
+            <div class="btns" style="margin-top:0">
+              <button class="smallbtn secondary" data-cert="${esc(ctrl.key)}">Scarica certificazione (PDF)</button>
+              <button class="smallbtn" data-attdl="${esc(ctrl.key)}" ${r?.attachmentB64 ? "" : "disabled"}>Scarica allegato</button>
+            </div>
+            <div class="muted">Se c’è un allegato, la certificazione verrà scaricata con allegato unito.</div>
+          </div>
+        </div>
+      ` : ``}
+
       ${ctrl.key==="viscosita" ? `
         <div class="row2" style="margin-top:10px">
           <div>
@@ -1858,6 +2127,53 @@ async function openCheckDetailPage(checkId){
     };
 
     setStar(valEl, false);
+
+    // Allegati + certificazioni (solo ΔE / Resa)
+    if(ctrl.key==="deltae" || ctrl.key==="resa"){
+      const fEl = card.querySelector(`input[data-detail-file="${CSS.escape(ctrl.key)}"]`);
+      if(fEl){
+        fEl.onchange = async () => {
+          const file = fEl.files?.[0] || null;
+          if(!file) return;
+          r.attachmentName = file.name || "allegato.pdf";
+          r.attachmentB64 = await fileToBase64(file);
+          const dlBtn = card.querySelector(`button[data-attdl="${CSS.escape(ctrl.key)}"]`);
+          if(dlBtn) dlBtn.disabled = !r.attachmentB64;
+          updateDetailTitle();
+        };
+      }
+
+      const certBtn = card.querySelector(`button[data-cert="${CSS.escape(ctrl.key)}"]`);
+      if(certBtn){
+        certBtn.onclick = async () => {
+          const specLabel = (ctrl.type==="num_max")
+            ? (ctrl.spec?.max!=null ? `${ctrl.spec.max}` : "")
+            : ((ctrl.spec?.min!=null || ctrl.spec?.max!=null) ? `${ctrl.spec?.min ?? ""}% – ${ctrl.spec?.max ?? ""}%` : "");
+
+          const kind = (ctrl.key==="deltae") ? "deltae" : "resa";
+          const mergedBytes = await buildMergedCertificatePdf({
+            kind,
+            product: cachedProduct,
+            check: detailCheck,
+            result: r,
+            specLabel
+          });
+
+          const filename = certFilename(kind==="deltae" ? "CERTIFICAZIONE_DE" : "CERTIFICAZIONE_RESA", detailCheck.code, detailCheck.lotto);
+          downloadBytes(filename, mergedBytes, "application/pdf");
+        };
+      }
+
+      const attBtn = card.querySelector(`button[data-attdl="${CSS.escape(ctrl.key)}"]`);
+      if(attBtn){
+        attBtn.onclick = async () => {
+          if(!r.attachmentB64) return;
+          const bytes = base64ToUint8Array(r.attachmentB64);
+          const filename = (r.attachmentName || "allegato.pdf");
+          downloadBytes(filename, bytes, "application/pdf");
+        };
+      }
+    }
   }
 
   const aEl = document.getElementById("detailAggiunte");
