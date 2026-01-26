@@ -856,7 +856,12 @@ function esc(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","
 function toNumber(v){ if(v===""||v===null||v===undefined) return null; const n=Number(v); return Number.isFinite(n)?n:null; }
 function csvEscape(v){ const s=String(v ?? ""); if(/[",\n;]/.test(s)) return '"' + s.replaceAll('"','""') + '"'; return s; }
 function downloadText(filename, text){
-  const blob=new Blob([text],{type:"text/plain;charset=utf-8"}
+  const blob=new Blob([text],{type:"text/plain;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+}
 
 
 // === FIX: helper per allegati PDF ===
