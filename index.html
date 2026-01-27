@@ -764,17 +764,28 @@ const DEFAULT_CONTROLS = [
   { key:"brillantezza",  name:"Brillantezza",   type:"num_minmax", unit:"gloss",    enabled:false, spec:{min:null,max:null}, extra:{ thickness_um:null } },
   { key:"peso_spec",     name:"Peso specifico", type:"num_minmax", unit:"Kg/L",     enabled:true,  spec:{min:null,max:null}, extra:{} },
 
-  // Nuovi controlli (di base disattivi)
-  { key:"deltae",        name:"DE",             type:"num_max",    unit:"DE",       enabled:false, spec:{max:null},          extra:{ allowPdf:true } },
-
-  { key:"conducibilita", name:"Conducibilità", type:"num_minmax", unit:"MOhm*cm",  enabled:false, spec:{min:null,max:null}, extra:{} },
-  { key:"residuo_secco", name:"Residuo secco",   type:"num_minmax", unit:"% p/p",     enabled:false, spec:{min:null,max:null}, extra:{ allowPdf:true } },
+  // Controlli di base disattivi (come richiesto)
   { key:"ph",            name:"pH",             type:"num_minmax", unit:"",         enabled:false, spec:{min:null,max:null}, extra:{} },
+  { key:"resa",          name:"Resa %",         type:"num_minmax", unit:"%",        enabled:false, spec:{min:98,max:102},      extra:{ allowPdf:true } },
+  { key:"deltae",        name:"DE",             type:"num_max",    unit:"DE",       enabled:false, spec:{max:null},            extra:{ allowPdf:true } },
+  { key:"conducibilita", name:"Conducibilità",  type:"num_minmax", unit:"MOhm*cm",  enabled:false, spec:{min:null,max:null},   extra:{} },
 
-  // Resa sempre dopo pH (di base disattiva)
-  { key:"resa",          name:"Resa %",          type:"num_minmax", unit:"%",        enabled:false, spec:{min:null,max:null}, extra:{ allowPdf:true } }
+  // Nuovo controllo (retroattivo) - ultimo
+  { key:"residuo_secco", name:"Residuo secco",  type:"num_minmax", unit:"% p/p",    enabled:false, spec:{min:null,max:null},   extra:{ allowPdf:true } }
 ];
-const CHECK_ENTRY_ORDER = ["viscosita","macinazione","brillantezza","peso_spec","ph","resa","deltae","conducibilita","residuo_secco"];
+
+// Ordine di inserimento / visualizzazione
+const CHECK_ENTRY_ORDER = [
+  "viscosita",
+  "macinazione",
+  "brillantezza",
+  "peso_spec",
+  "ph",
+  "resa",
+  "deltae",
+  "conducibilita",
+  "residuo_secco"
+];
 
 /* =========================
    Firebase (Firestore)
