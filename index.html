@@ -675,15 +675,15 @@ const DEFAULT_CONTROLS = [
   { key:"peso_spec",     name:"Peso specifico", type:"num_minmax", unit:"Kg/L",     enabled:true,  spec:{min:null,max:null}, extra:{} },
 
   // Nuovi controlli (di base disattivi)
-  { key:"deltae",        name:"ΔE",             type:"num_max",    unit:"ΔE",       enabled:false, spec:{max:null},          extra:{ allowPdf:true } },
+  { key:"deltae",        name:"DE",             type:"num_max",    unit:"DE",       enabled:false, spec:{max:null},          extra:{ allowPdf:true } },
 
   { key:"conducibilita", name:"Conducibilità",  type:"num_minmax", unit:"MOhm*cm",  enabled:false, spec:{min:null,max:null}, extra:{} },
   { key:"ph",            name:"pH",             type:"num_minmax", unit:"",         enabled:false, spec:{min:null,max:null}, extra:{} },
 
   // Resa sempre dopo pH (di base disattiva)
-  { key:"resa",          name:"Resa %",          type:"num_minmax", unit:"%",        enabled:false, spec:{min:98,max:102}, extra:{ allowPdf:true } },
+  { key:"resa",          name:"Resa %",          type:"num_minmax", unit:"%",        enabled:false, spec:{min:null,max:null}, extra:{ allowPdf:true } }
 ];
-const CHECK_ENTRY_ORDER = ["viscosita","macinazione","brillantezza","peso_spec","deltae","conducibilita","ph","resa"];
+const CHECK_ENTRY_ORDER = ["viscosita","macinazione","brillantezza","peso_spec","ph","resa","deltae","conducibilita"];
 
 /* =========================
    Firebase (Firestore)
@@ -864,33 +864,20 @@ function downloadText(filename, text){
   URL.revokeObjectURL(a.href);
 }
 
-
-// === Allegati PDF (base64) ===
-// Legge un PDF e ritorna base64 "pulito" (senza prefisso data:...)
-// Ritorna null se non viene selezionato nulla.
-function readPdfAttachment(file){
-  return new Promise((resolve, reject) => {
+function fileToBase64(file){
+  return new Promise((resolve, reject)=>{
     if(!file){ resolve(null); return; }
-    if(file.type && file.type !== "application/pdf"){
-      // Lasciamo passare comunque, ma avvisiamo in console
-      console.warn("Allegato non-PDF:", file.type, file.name);
-    }
     const reader = new FileReader();
     reader.onload = () => {
       const res = String(reader.result || "");
       const b64 = res.includes(",") ? res.split(",")[1] : res;
-      resolve({
-        name: file.name || "allegato.pdf",
-        type: file.type || "application/pdf",
-        size: file.size || null,
-        b64
-      });
+      resolve(b64 || null);
     };
-    reader.onerror = () => reject(reader.error || new Error("Errore lettura file"));
+    reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 }
-// === END Allegati PDF ===
+
 
 /* =========================
    PDF: Certificazioni ΔE / Resa
@@ -986,29 +973,29 @@ async function buildCertificatePdfBytes({ kind, product, check, result, specLabe
   function writePara(txt){
     const lines = doc.splitTextToSize(txt, pageW - margin*2);
     doc.text(lines, margin, y);
-    y += lines.length * 5.2 + 2;
+    y += lines.length * 4.8 + 3;
   }
 
   if(kind === "deltae"){
     doc.setFont("helvetica","bold"); doc.setFontSize(13);
-    doc.text("CERTIFICAZIONE DI CONTROLLO COLORE (ΔE)", margin, y); y += 8;
+    doc.text("CERTIFICAZIONE DI CONTROLLO COLORE (DE)", margin, y); y += 8;
 
     doc.setFont("helvetica","normal"); doc.setFontSize(10);
 
-    writePara("Il presente documento attesta l’esecuzione del controllo colore mediante determinazione del valore ΔE sul prodotto indicato.");
+    writePara("Il presente documento attesta l’esecuzione del controllo colore mediante determinazione del valore DE sul prodotto indicato.");
     writePara("La prova è stata eseguita dal Laboratorio VivColor secondo procedure interne del laboratorio, che prevedono l’applicazione del prodotto a spruzzo, con diluizione standard, fino a copertura uniforme ed essiccazione completa del film.");
     writePara("La misurazione è stata effettuata secondo lo spazio colore CIELAB, con geometria di misura 8 mm e illuminante D65, mediante spettrofotometro YS6020.");
     writePara("Strumento di misura: Spettrofotometro YS6020 – Codice interno LAB.29");
-    writePara("Il valore di ΔE rilevato, che rappresenta lo scostamento cromatico del campione analizzato rispetto allo standard di riferimento, risulta pari a:");
+    writePara("Il valore di DE rilevato, che rappresenta lo scostamento cromatico del campione analizzato rispetto allo standard di riferimento, risulta pari a:");
 
     doc.setFont("helvetica","bold");
-    doc.text(`ΔE rilevato: ${result?.value ?? ""}`, margin, y); y += 8;
+    doc.text(`DE rilevato: ${result?.value ?? ""}`, margin, y); y += 8;
 
     doc.setFont("helvetica","normal");
     writePara("Il controllo è da considerarsi conforme qualora il valore di ΔE rilevato risulti uguale o inferiore al limite di accettazione previsto, definito in funzione delle specifiche di prodotto e/o delle richieste del cliente:");
 
     doc.setFont("helvetica","bold");
-    doc.text(`Limite di accettazione ΔE: ${specLabel ?? ""}`, margin, y); y += 8;
+    doc.text(`Limite di accettazione DE: ${specLabel ?? ""}`, margin, y); y += 8;
 
     doc.setFont("helvetica","normal");
     writePara("Eventuale documentazione strumentale, report di misura o materiale di supporto allegati costituiscono parte integrante della presente certificazione.");
@@ -1092,7 +1079,6 @@ async function buildMergedCertificatePdf({ kind, product, check, result, specLab
   const out = await merged.save();
   return out;
 }
-
 
 /* =========================
    Views
@@ -1653,7 +1639,7 @@ async function saveNewProduct(){
     if(c.key==="brillantezza"){ c.unit="gloss"; }
     if(c.key==="conducibilita"){ c.unit="MOhm*cm"; }
     if(c.key==="peso_spec"){ c.unit="Kg/L"; }
-    if(c.key==="deltae"){ c.unit="ΔE"; c.type="num_max"; c.spec = {max: c.spec?.max ?? null}; }
+    if(c.key==="deltae"){ c.unit="DE"; c.type="num_max"; c.spec = {max: c.spec?.max ?? null}; }
     if(c.key==="resa"){ c.unit="%"; c.type="num_minmax"; c.spec = {min: c.spec?.min ?? null, max: c.spec?.max ?? null}; }
   }
 
@@ -1685,7 +1671,7 @@ async function saveSetup(){
     if(c.key==="brillantezza"){ c.unit="gloss"; }
     if(c.key==="conducibilita"){ c.unit="MOhm*cm"; }
     if(c.key==="peso_spec"){ c.unit="Kg/L"; }
-    if(c.key==="deltae"){ c.unit="ΔE"; c.type="num_max"; c.spec = {max: c.spec?.max ?? null}; }
+    if(c.key==="deltae"){ c.unit="DE"; c.type="num_max"; c.spec = {max: c.spec?.max ?? null}; }
     if(c.key==="resa"){ c.unit="%"; c.type="num_minmax"; c.spec = {min: c.spec?.min ?? null, max: c.spec?.max ?? null}; }
   }
 
@@ -1854,8 +1840,8 @@ async function saveCheck(){
       const fInp = document.querySelector(`#checkRows input[type="file"][data-file="${CSS.escape(c.key)}"]`);
       const file = fInp?.files?.[0] || null;
       if(file){
-        const att = await readPdfAttachment(file);
-        if(att){ r.attachmentName = att.name; r.attachmentB64 = att.b64; }
+        attachmentName = file.name || "allegato.pdf";
+        attachmentB64 = await fileToBase64(file);
       }
     }
 
@@ -2153,8 +2139,7 @@ async function openCheckDetailPage(checkId){
           const file = fEl.files?.[0] || null;
           if(!file) return;
           r.attachmentName = file.name || "allegato.pdf";
-          const att = await readPdfAttachment(file);
-        if(att){ r.attachmentName = att.name; r.attachmentB64 = att.b64; }
+          r.attachmentB64 = await fileToBase64(file);
           const dlBtn = card.querySelector(`button[data-attdl="${CSS.escape(ctrl.key)}"]`);
           if(dlBtn) dlBtn.disabled = !r.attachmentB64;
           updateDetailTitle();
