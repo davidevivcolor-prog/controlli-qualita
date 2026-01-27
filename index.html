@@ -210,22 +210,26 @@
   /* ===== CoA Modal ===== */
   .overlay{
     position:fixed; inset:0;
-    background:rgba(0,0,0,.55);
+    background:rgba(0,0,0,.35);
     display:flex; align-items:center; justify-content:center;
     z-index:9999;
   }
   .overlay.hide{ display:none; }
   .modal{
+    color:#111;
     width:min(760px, 92vw);
     max-height:86vh;
     overflow:auto;
-    background:#121212;
-    border:1px solid rgba(255,255,255,.12);
+    background:#ffffff;
+    border:1px solid rgba(0,0,0,.12);
     border-radius:14px;
     box-shadow: 0 20px 60px rgba(0,0,0,.6);
     padding:16px;
   }
   .modal h3{ margin:0 0 6px 0; }
+  .modal input, .modal select, .modal textarea{ color:#111; background:#fff; border:1px solid rgba(0,0,0,.18); }
+  .modal input::placeholder{ color:rgba(0,0,0,.55); }
+
   .modal .muted{ opacity:.82; }
   .checklist{
     display:grid;
@@ -238,9 +242,9 @@
     gap:10px;
     align-items:flex-start;
     padding:10px;
-    border:1px solid rgba(255,255,255,.08);
+    border:1px solid rgba(0,0,0,.10);
     border-radius:12px;
-    background:rgba(255,255,255,.03);
+    background:rgba(0,0,0,.03);
   }
   .checkitem b{ display:block; line-height:1.1; }
   .checkitem .muted{ font-size:12px; }
@@ -763,13 +767,14 @@ const DEFAULT_CONTROLS = [
   // Nuovi controlli (di base disattivi)
   { key:"deltae",        name:"DE",             type:"num_max",    unit:"DE",       enabled:false, spec:{max:null},          extra:{ allowPdf:true } },
 
-  { key:"conducibilita", name:"Conducibilità",  type:"num_minmax", unit:"MOhm*cm",  enabled:false, spec:{min:null,max:null}, extra:{} },
+  { key:"conducibilita","residuo_secco", name:"Conducibilità",  type:"num_minmax", unit:"MOhm*cm",  enabled:false, spec:{min:null,max:null}, extra:{} },
+  { key:"residuo_secco", name:"Residuo secco",   type:"num_minmax", unit:"% p/p",     enabled:false, spec:{min:null,max:null}, extra:{ allowPdf:true } },
   { key:"ph",            name:"pH",             type:"num_minmax", unit:"",         enabled:false, spec:{min:null,max:null}, extra:{} },
 
   // Resa sempre dopo pH (di base disattiva)
   { key:"resa",          name:"Resa %",          type:"num_minmax", unit:"%",        enabled:false, spec:{min:null,max:null}, extra:{ allowPdf:true } }
 ];
-const CHECK_ENTRY_ORDER = ["viscosita","macinazione","brillantezza","peso_spec","ph","resa","deltae","conducibilita"];
+const CHECK_ENTRY_ORDER = ["viscosita","macinazione","brillantezza","peso_spec","ph","resa","deltae","conducibilita","residuo_secco"];
 
 /* =========================
    Firebase (Firestore)
@@ -1226,8 +1231,10 @@ async function buildCoAPdfBytes({ product, check, selectedKeys, expiryDate }){
   async function drawHeaderFooter(){
     try{
       const hImg = await fetchImageDataUrl(COA_HEADER_URL);
-      headerH = (hImg.h / hImg.w) * pageW;
-      doc.addImage(hImg.dataUrl, hImg.format, 0, 0, pageW, headerH);
+      const sidePad = 30; // mm (~3 cm)
+      const imgW = pageW - sidePad*2;
+      headerH = (hImg.h / hImg.w) * imgW;
+      doc.addImage(hImg.dataUrl, hImg.format, sidePad, 0, imgW, headerH);
     }catch(err){
       console.warn("Header non caricato:", err);
       headerH = 0;
@@ -1235,8 +1242,10 @@ async function buildCoAPdfBytes({ product, check, selectedKeys, expiryDate }){
 
     try{
       const fImg = await fetchImageDataUrl(COA_FOOTER_URL);
-      footerH = (fImg.h / fImg.w) * pageW;
-      doc.addImage(fImg.dataUrl, fImg.format, 0, pageH - footerH, pageW, footerH);
+      const sidePad = 30; // mm (~3 cm)
+      const imgW = pageW - sidePad*2;
+      footerH = (fImg.h / fImg.w) * imgW;
+      doc.addImage(fImg.dataUrl, fImg.format, sidePad, pageH - footerH, imgW, footerH);
     }catch(err){
       console.warn("Footer non caricato:", err);
       footerH = 0;
@@ -1258,13 +1267,13 @@ async function buildCoAPdfBytes({ product, check, selectedKeys, expiryDate }){
       try{
         const hImg = __imgCache.get(COA_HEADER_URL);
         if(hImg){
-          doc.addImage(hImg.dataUrl, hImg.format, 0, 0, pageW, headerH);
+          doc.addImage(hImg.dataUrl, hImg.format, 30, 0, pageW-60, headerH);
         }
       }catch(_){}
       try{
         const fImg = __imgCache.get(COA_FOOTER_URL);
         if(fImg){
-          doc.addImage(fImg.dataUrl, fImg.format, 0, pageH - footerH, pageW, footerH);
+          doc.addImage(fImg.dataUrl, fImg.format, 30, pageH - footerH, pageW-60, footerH);
         }
       }catch(_){}
     }
@@ -1312,7 +1321,7 @@ async function buildCoAPdfBytes({ product, check, selectedKeys, expiryDate }){
   doc.setFont("helvetica","bold");
   doc.setFontSize(11);
   doc.text("Risultati delle prove", margin, y);
-  y += 6;
+  y += 10;
 
   const cols = [
     { label:"Parametro", w: (boxW*0.46) },
@@ -1387,7 +1396,7 @@ async function buildCoAPdfBytes({ product, check, selectedKeys, expiryDate }){
   doc.setFont("helvetica","bold");
   doc.setFontSize(11);
   doc.text("Dichiarazione di conformità", margin, y);
-  y += 6;
+  y += 10;
 
   doc.setFont("helvetica","normal");
   doc.setFontSize(10);
