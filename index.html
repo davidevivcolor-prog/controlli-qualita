@@ -764,28 +764,42 @@ const DEFAULT_CONTROLS = [
   { key:"brillantezza",  name:"Brillantezza",   type:"num_minmax", unit:"gloss",    enabled:false, spec:{min:null,max:null}, extra:{ thickness_um:null } },
   { key:"peso_spec",     name:"Peso specifico", type:"num_minmax", unit:"Kg/L",     enabled:true,  spec:{min:null,max:null}, extra:{} },
 
-  // Controlli di base disattivi (come richiesto)
+  // Nuovi controlli (di base disattivi)
+  { key:"deltae",        name:"DE",             type:"num_max",    unit:"DE",       enabled:false, spec:{max:null},          extra:{ allowPdf:true } },
+
+  { key:"conducibilita", name:"Conducibilità", type:"num_minmax", unit:"MOhm*cm",  enabled:false, spec:{min:null,max:null}, extra:{} },
+  { key:"residuo_secco", name:"Residuo secco",   type:"num_minmax", unit:"% p/p",     enabled:false, spec:{min:null,max:null}, extra:{ allowPdf:true } },
   { key:"ph",            name:"pH",             type:"num_minmax", unit:"",         enabled:false, spec:{min:null,max:null}, extra:{} },
-  { key:"resa",          name:"Resa %",         type:"num_minmax", unit:"%",        enabled:false, spec:{min:98,max:102},      extra:{ allowPdf:true } },
-  { key:"deltae",        name:"DE",             type:"num_max",    unit:"DE",       enabled:false, spec:{max:null},            extra:{ allowPdf:true } },
-  { key:"conducibilita", name:"Conducibilità",  type:"num_minmax", unit:"MOhm*cm",  enabled:false, spec:{min:null,max:null},   extra:{} },
 
-  // Nuovo controllo (retroattivo) - ultimo
-  { key:"residuo_secco", name:"Residuo secco",  type:"num_minmax", unit:"% p/p",    enabled:false, spec:{min:null,max:null},   extra:{ allowPdf:true } }
+  // Resa sempre dopo pH (di base disattiva)
+  { key:"resa",          name:"Resa %",          type:"num_minmax", unit:"%",        enabled:false, spec:{min:null,max:null}, extra:{ allowPdf:true } }
 ];
 
-// Ordine di inserimento / visualizzazione
-const CHECK_ENTRY_ORDER = [
-  "viscosita",
-  "macinazione",
-  "brillantezza",
-  "peso_spec",
-  "ph",
-  "resa",
-  "deltae",
-  "conducibilita",
-  "residuo_secco"
-];
+function mergeControlsSchema(existing){
+  const byKey = new Map((existing || []).map(c => [c.key, c]));
+  const merged = DEFAULT_CONTROLS.map(def => {
+    const cur = byKey.get(def.key);
+    if(!cur) return deepClone(def);
+    // Merge keeping existing values/spec/extra but ensuring new fields exist
+    return {
+      ...deepClone(def),
+      ...cur,
+      spec: { ...(deepClone(def).spec||{}), ...(cur.spec||{}) },
+      extra:{ ...(deepClone(def).extra||{}), ...(cur.extra||{}) }
+    };
+  });
+
+  // Preserve any custom controls not in defaults (append at end)
+  for(const c of (existing || [])){
+    if(!DEFAULT_CONTROLS.some(d => d.key === c.key)){
+      merged.push(c);
+    }
+  }
+  return merged;
+}
+
+
+const CHECK_ENTRY_ORDER = ["viscosita","macinazione","brillantezza","peso_spec","ph","resa","deltae","conducibilita","residuo_secco"];
 
 /* =========================
    Firebase (Firestore)
@@ -1006,7 +1020,13 @@ function downloadBytes(filename, bytes, mime="application/pdf"){
   URL.revokeObjectURL(a.href);
 }
 
-function pdfSafe(s){ return String(s ?? "").replaceAll("\r","").trim(); }
+function pdfSafe(s){
+  return String(s ?? "")
+    .replaceAll("\r","")
+    .replace(/[–—]/g, "-")
+    .replace(/\u00A0/g, " ")
+    .trim();
+}
 
 function certFilename(prefix, code, lotto){
   const safeCode = normalizeCode(code).replaceAll(" ", "");
@@ -1380,7 +1400,7 @@ async function buildCoAPdfBytes({ product, check, selectedKeys, expiryDate }){
     // altre celle
     for(let i=1;i<cols.length;i++){
       doc.rect(x, y, cols[i].w, h);
-      const txt = String(cells[i] ?? "");
+      const txt = pdfSafe(cells[i] ?? "");
       doc.text(txt, x+2, y+4, { maxWidth: cols[i].w - 4 });
       x += cols[i].w;
     }
@@ -1391,7 +1411,7 @@ async function buildCoAPdfBytes({ product, check, selectedKeys, expiryDate }){
 
   const results = (check?.results || []).filter(r => selectedKeys.includes(r.key));
   if(results.length === 0){
-    drawRow(["—", "—", "—", "—"]);
+    drawRow(["-", "-", "-", "-"]);
   } else {
     for(const r of results){
       const std = r.specText ?? "";
@@ -1790,6 +1810,22 @@ async function loadProduct(rawCode){
 
   currentCode = code;
   cachedProduct = p;
+
+
+  // Retro-compatibilità: aggiunge automaticamente eventuali nuovi controlli ai prodotti già esistenti
+  const mergedControls = mergeControlsSchema(p.controls || []);
+  const hadMissing = (p.controls || []).length !== mergedControls.length
+    || (DEFAULT_CONTROLS.some(d => !(p.controls||[]).some(c => c.key === d.key)));
+  if(hadMissing){
+    p.controls = mergedControls;
+    cachedProduct = p;
+    try{ await put(t.objectStore(STORES.products), p); } catch(e){ console.warn("Migrazione controlli prodotto fallita:", e); }
+  } else {
+    // comunque allinea l'ordine/struttura in memoria
+    p.controls = mergedControls;
+    cachedProduct = p;
+  }
+
 
   document.getElementById("prodTitle").textContent = `${p.code} — ${p.name}`;
   document.getElementById("prodMeta").textContent = `Creato: ${fmtDateTime(p.createdAtISO)}`;
