@@ -44,6 +44,25 @@
     header h1{ font-size:14px; margin:0; font-weight:900; letter-spacing:.2px; }
     header .sub{ color:var(--m); font-size:12px; }
 
+    .brand{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      min-width:220px;
+    }
+    .brandlogo{
+      height:34px;
+      width:auto;
+      display:block;
+      flex:0 0 auto;
+    }
+    @media(max-width:520px){
+      header{ padding:12px 12px; }
+      header .sub{ display:none; }
+      .brandlogo{ height:28px; }
+    }
+    button{ min-height:40px; }
+
     .wrap{ max-width:1200px; margin:0 auto; padding:16px; }
     .grid{ display:grid; gap:14px; grid-template-columns:1fr; }
     @media(min-width:980px){ .grid{ grid-template-columns: 360px 1fr; } }
@@ -258,9 +277,12 @@
 <body>
 <header>
   <div class="row">
-    <div>
-      <h1>Registro Controlli (Cloud)</h1>
-      <div class="sub">Dati salvati nel cloud (Firestore). Versione prototipo.</div>
+    <div class="brand">
+      <img class="brandlogo" src="assets/logo_vivcolor.png" alt="VivColor" />
+      <div>
+        <h1>Registro Controlli (Cloud)</h1>
+        <div class="sub">Dati salvati nel cloud (Firestore). Versione prototipo.</div>
+      </div>
     </div>
     <div class="muted" id="dbStatus">DB: pronto</div>
   </div>
@@ -695,7 +717,7 @@
         </div>
 
         <div class="muted" style="margin-top:10px">
-          Campi modificati → indicati con <b>*</b>. Ogni controllo tiene traccia della modifica (quando + valore precedente).
+          Campi modificati / indicati con <b>*</b>. Ogni controllo tiene traccia della modifica (quando + valore precedente).
         </div>
       </div>
 
@@ -1029,6 +1051,9 @@ function pdfSafe(s){
   return String(s ?? "")
     .replaceAll("\r","")
     .replaceAll("\n"," ")
+    // freccia range "min → max" non supportata: usiamo "/"
+    .replace(/\u2192/g, " / ")
+    .replace(/→/g, " / ")
     // trattini / meno / varianti unicode -> "-"
     .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\u00AD\u2043\uFE58\uFE63\uFF0D]/g, "-")
     // simboli matematici (meglio ASCII)
@@ -1658,7 +1683,7 @@ function describeSpec(c){
   if(c.type === "num_minmax"){
     const mn=c.spec?.min, mx=c.spec?.max;
     if(mn==null && mx==null) return "(vuoto)";
-    if(mn!=null && mx!=null) return `${mn} → ${mx}`;
+    if(mn!=null && mx!=null) return `${mn} / ${mx}`;
     if(mn!=null) return `≥ ${mn}`;
     return `≤ ${mx}`;
   }
@@ -1678,7 +1703,7 @@ function specText(c){
   if(c.type==="num_minmax"){
     const mn=c.spec?.min, mx=c.spec?.max;
     if(mn==null && mx==null) return "";
-    if(mn!=null && mx!=null) return `${mn} → ${mx}`;
+    if(mn!=null && mx!=null) return `${mn} / ${mx}`;
     if(mn!=null) return `≥ ${mn}`;
     return `≤ ${mx}`;
   }
@@ -1736,7 +1761,7 @@ function lastModText(check, key){
   const mods = check.modifications?.[key];
   if(!Array.isArray(mods) || mods.length===0) return "";
   const last = mods[mods.length-1];
-  return `Modificato il ${fmtDateTime(last.at)} — prima: ${last.old ?? ""} → ora: ${last.new ?? ""}`;
+  return `Modificato il ${fmtDateTime(last.at)} — prima: ${last.old ?? ""} / ora: ${last.new ?? ""}`;
 }
 
 /* =========================
