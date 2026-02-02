@@ -1610,8 +1610,14 @@ const views = {
   operators: document.getElementById("viewOperators"),
 };
 function showView(name){
-  Object.values(views).forEach(v=>v.classList.add("hide"));
-  views[name].classList.remove("hide");
+  // UI a viste dinamiche: alcune view possono non esistere (null)
+  Object.values(views).forEach(v=>{ if(v) v.classList.add("hide"); });
+  const target = views[name];
+  if(!target){
+    console.warn("showView: view mancante:", name);
+    return;
+  }
+  target.classList.remove("hide");
 }
 
 /* =========================
@@ -2820,13 +2826,13 @@ function openCoAModal(){
     paramsWrap.appendChild(div);
   }
 
-  overlay.classList.remove("hide");
+  if(overlay) overlay.classList.remove("hide");
   overlay.setAttribute("aria-hidden","false");
 }
 
 function closeCoAModal(){
   const overlay = document.getElementById("coaOverlay");
-  overlay.classList.add("hide");
+  if(overlay) overlay.classList.add("hide");
   overlay.setAttribute("aria-hidden","true");
 }
 
