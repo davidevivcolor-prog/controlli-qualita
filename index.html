@@ -3003,24 +3003,50 @@ document.getElementById("setupSaveBtn").addEventListener("click", saveSetup);
 document.getElementById("addCustomControlBtnNew").addEventListener("click", ()=> addCustomControl("new"));
 document.getElementById("addCustomControlBtnEdit").addEventListener("click", ()=> addCustomControl("edit"));
 
-document.getElementById("newCheckBtn").addEventListener("click", startNewCheck);
-document.getElementById("operatorsBtn").addEventListener("click", ()=>{ renderOperatorsList(); showView("operators"); });
-document.getElementById("operatorsBackBtn").addEventListener("click", ()=> showView("home"));
-document.getElementById("saveOperatorBtn").addEventListener("click", ()=>{
-  const role = (document.getElementById("operatorRole").value||"").trim();
-  const name = (document.getElementById("opName").value||"").trim();
-  const surname = (document.getElementById("opSurname").value||"").trim();
-  const code = (document.getElementById("opCode").value||"").trim();
-  if(!role || !name || !surname || !code) return alert("Compila ruolo, nome, cognome e sigla.");
-  const list = loadOperators();
-  const formatted = formatOperator({role,name,surname,code});
-  const exists = list.some(o=> formatOperator(o)===formatted);
-  if(exists) return alert("Operatore già presente.");
-  list.push({ role, name, surname, code });
-  saveOperators(list);
-  renderOperatorsList();
-  alert("Operatore salvato ✅");
-});
+const newCheckBtn = document.getElementById("newCheckBtn");
+if (newCheckBtn) {
+  newCheckBtn.addEventListener("click", startNewCheck);
+}
+
+const operatorsBtn = document.getElementById("operatorsBtn");
+if (operatorsBtn) {
+  operatorsBtn.addEventListener("click", ()=>{
+    renderOperatorsScreen();
+    showView("operators");
+  });
+}
+
+const operatorsBackBtn = document.getElementById("operatorsBackBtn");
+if (operatorsBackBtn) {
+  operatorsBackBtn.addEventListener("click", ()=> showView("home"));
+}
+
+const saveOperatorBtn = document.getElementById("saveOperatorBtn");
+if (saveOperatorBtn) {
+  saveOperatorBtn.addEventListener("click", ()=>{
+    const role = (document.getElementById("operatorRole")?.value || "").trim();
+    const name = (document.getElementById("opName")?.value || "").trim();
+    const surname = (document.getElementById("opSurname")?.value || "").trim();
+    const code = (document.getElementById("opCode")?.value || "").trim();
+
+    if(!role || !name || !surname || !code){
+      alert("Compila ruolo, nome, cognome e sigla.");
+      return;
+    }
+
+    try{
+      upsertOperator(
+        role === "produzione" ? "prod" : "qc",
+        { nome: name, cognome: surname, sigla: code }
+      );
+      renderOperatorsScreen();
+      alert("Operatore salvato ✅");
+    }catch(e){
+      alert(e.message || String(e));
+    }
+  });
+}
+
 document.getElementById("cancelCheckBtn").addEventListener("click", async ()=> loadProduct(currentCode));
 document.getElementById("saveCheckBtn").addEventListener("click", saveCheck);
 
