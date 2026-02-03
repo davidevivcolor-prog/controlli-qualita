@@ -454,8 +454,7 @@
                 <th>Effettuato da</th>
                 <th class="right">Apri</th>
     <th class="right">Elimina</th>
-                <th class="right">Elimina</th>
-              </tr>
+</tr>
             </thead>
             <tbody id="allProductsBody"></tbody>
           </table>
@@ -791,6 +790,8 @@
         <div class="muted" style="margin-top:10px">
           Campi modificati / indicati con <b>*</b>. Ogni controllo tiene traccia della modifica (quando + valore precedente).
         </div>
+      </div>
+
       <!-- OPERATORS -->
       <div id="viewOperators" class="hide">
         <div class="topline">
@@ -919,7 +920,6 @@
     </div>
   </div>
 
-  <div 
   <!-- CoA (Certificato di Analisi) Modal -->
   <div id="coaOverlay" class="overlay hide" aria-hidden="true">
     <div class="modal">
@@ -2653,7 +2653,7 @@ async function renderHistory(){
 
   if(checks.length===0){
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="${11 + controls.length}" class="muted">Nessun risultato con questi filtri.</td>`;
+    tr.innerHTML = `<td colspan="${12 + controls.length}" class="muted">Nessun risultato con questi filtri.</td>`;
     body.appendChild(tr);
     return;
   }
@@ -2679,7 +2679,7 @@ async function renderHistory(){
       <td class="cellWrap">${esc(chk.meta?.note ?? "")}</td>
       <td class="mono">${esc(chk.meta?.prodottoDa ?? "")}</td>
       <td class="mono">${esc(chk.meta?.effettuatoDa ?? "")}</td>
-      <td class="right"><button class="smallbtn secondary" data-open="${esc(chk.id)}">Apri</button></td>
+      <td class="right"><button class="smallbtn secondary" data-open="${esc(chk.id)}">Apri</button></td>      <td class="right"><button class="smallbtn danger" data-delcheck="${esc(chk.id)}">Elimina</button></td>
 `;
     body.appendChild(tr);
   }
