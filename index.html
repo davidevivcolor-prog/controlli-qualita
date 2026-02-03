@@ -3466,6 +3466,28 @@ function ensureOperatorIds(list){
 }
 function esc2(s){ return esc(s ?? ""); }
 function normOp(s){ return (s||"").toString().trim().toLowerCase(); }
+
+// Verifica se un operatore inserito a mano è già presente nell'elenco.
+// Accetta match su stringa completa "SIGLA - Cognome Nome", oppure solo SIGLA o Cognome.
+function isOperatorInList(input, formattedList){
+  const v = normOp(input);
+  if(!v) return true;
+  const list = Array.isArray(formattedList) ? formattedList : [];
+  return list.some(s=>{
+    const n = normOp(s);
+    if(!n) return false;
+    if(n===v) return true;
+    // "sigla - cognome nome"
+    const parts = n.split(" - ");
+    const code = (parts[0]||"").trim();
+    if(code && code===v) return true;
+    const rest = (parts[1]||"").trim();
+    const surname = (rest.split(" ")[0]||"").trim();
+    if(surname && surname===v) return true;
+    // fallback: contenuto
+    return n.includes(v);
+  });
+}
 function formatOperator(o){
   const code = (o.code||"").trim();
   const surname = (o.surname||"").trim();
