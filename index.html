@@ -1071,6 +1071,7 @@ const fs = getFirestore(app);
 // Collections
 const COL_PRODUCTS = "products";
 const COL_CHECKS = "checks";
+const COL_OPERATORS = "operators";
 
 // Store names (legacy-compatible)
 const STORES = { products: 'products', checks: 'checks' };
@@ -2233,7 +2234,7 @@ function renderSetupControls(mode){
   });
 
   container.querySelectorAll("button[data-delete]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
+    btn.addEventListener("click", async ()=>{
       const k = btn.getAttribute("data-delete");
       const idx = working.findIndex(x=>x.key===k);
       if(idx<0) return;
@@ -3187,13 +3188,13 @@ on("addCustomControlBtnNew","click",()=> addCustomControl("new"));
 on("addCustomControlBtnEdit","click",()=> addCustomControl("edit"));
 
 on("newCheckBtn","click",startNewCheck);
-on("operatorsBtn","click",()=>{ renderOperatorsList(); resetOperatorForm(); showView("operators"); });
+on("operatorsBtn","click",async ()=>{ await syncOperatorsFromCloud(); renderOperatorsList(); resetOperatorForm(); showView("operators"); });
 on("operatorsBackBtn","click",()=> showView("home"));
 on("backToOperatorsBtn","click",()=>{ renderOperatorsList(); showView("operators"); });
 
 on("cancelEditOperatorBtn","click",()=>{ resetOperatorForm(); });
 
-on("saveOperatorBtn","click",()=>{
+on("saveOperatorBtn","click",async ()=>{
   const role = (document.getElementById("operatorRole").value||"").trim();
   const name = (document.getElementById("opName").value||"").trim();
   const surname = (document.getElementById("opSurname").value||"").trim();
@@ -3214,12 +3215,14 @@ on("saveOperatorBtn","click",()=>{
     if(idx<0) return alert("Operatore non trovato (forse cancellato).");
     list[idx] = { ...list[idx], role, name, surname, code };
     saveOperators(list);
+    try{ await upsertOperatorCloud(list[idx]); }catch(_){ }
     renderOperatorsList();
     resetOperatorForm();
     alert("Operatore aggiornato ✅");
   } else {
     list.push({ id: genId(), role, name, surname, code });
     saveOperators(list);
+    try{ await upsertOperatorCloud(list[idx]); }catch(_){ }
     renderOperatorsList();
     resetOperatorForm();
     alert("Operatore salvato ✅");
@@ -3354,13 +3357,98 @@ const OPERATORS_KEY = "vivcolor_operators_v1";
 function genId(){
   return "op_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,8);
 }
-function loadOperators(){
+function loadOperatorsLocal(){
   try{ return JSON.parse(localStorage.getItem(OPERATORS_KEY) || "[]"); }
   catch(_){ return []; }
 }
-function saveOperators(list){
+function saveOperatorsLocal(list){
   localStorage.setItem(OPERATORS_KEY, JSON.stringify(list || []));
 }
+
+let cachedOperators = [];
+
+function loadOperators(){
+  if(!cachedOperators || !cachedOperators.length){
+    cachedOperators = ensureOperatorIds(loadOperatorsLocal());
+  }
+  return (cachedOperators || []).slice();
+}
+function saveOperators(list){
+  cachedOperators = ensureOperatorIds(Array.isArray(list) ? list : []);
+  saveOperatorsLocal(cachedOperators);
+}
+
+// --- Cloud sync (Firestore) ---
+async function fetchOperatorsCloud(){
+  const snap = await getDocs(collection(fs, COL_OPERATORS));
+  const out = [];
+  snap.forEach(d=>{
+    const v = d.data() || {};
+    // id stabile = doc id
+    out.push({ id:d.id, ...v });
+  });
+  return out;
+}
+async function upsertOperatorCloud(op){
+  if(!op || !op.id) return;
+  const payload = {
+    role: op.role || "",
+    code: op.code || "",
+    surname: op.surname || "",
+    name: op.name || "",
+    updatedAt: new Date().toISOString()
+  };
+  await setDoc(doc(fs, COL_OPERATORS, op.id), payload, { merge:true });
+}
+async function deleteOperatorCloud(id){
+  if(!id) return;
+  await deleteDoc(doc(fs, COL_OPERATORS, id));
+}
+
+// merge: cloud wins if has newer updatedAt, else local
+function mergeOperators(localList, cloudList){
+  const byId = new Map();
+  (Array.isArray(localList)?localList:[]).forEach(o=>{
+    if(o && o.id) byId.set(o.id, o);
+  });
+  (Array.isArray(cloudList)?cloudList:[]).forEach(o=>{
+    if(!o || !o.id) return;
+    const cur = byId.get(o.id);
+    if(!cur){ byId.set(o.id, o); return; }
+    const lt = cur.updatedAt ? Date.parse(cur.updatedAt) : 0;
+    const ct = o.updatedAt ? Date.parse(o.updatedAt) : 0;
+    if(ct >= lt) byId.set(o.id, { ...cur, ...o });
+  });
+  return Array.from(byId.values());
+}
+
+async function syncOperatorsFromCloud(){
+  // 1) carica local in memoria
+  cachedOperators = ensureOperatorIds(loadOperatorsLocal());
+
+  // 2) prova a prendere cloud e merge
+  try{
+    const cloud = await fetchOperatorsCloud();
+    const merged = ensureOperatorIds(mergeOperators(cachedOperators, cloud));
+
+    cachedOperators = merged;
+    saveOperatorsLocal(merged);
+
+    // 3) se local aveva operatori nuovi senza updatedAt, pubblicali
+    const cloudIds = new Set((cloud||[]).map(o=>o.id));
+    const toPush = merged.filter(o=> !cloudIds.has(o.id));
+    for(const o of toPush){
+      try{ await upsertOperatorCloud(o); }catch(_){}
+    }
+  }catch(err){
+    console.warn("Sync operatori cloud fallita:", err);
+  }
+
+  // refresh UI se siamo già dentro
+  try{ renderOperatorsList(); }catch(_){}
+  try{ renderOperatorPickers(); }catch(_){}
+}
+
 function ensureOperatorIds(list){
   const ops = Array.isArray(list) ? list : [];
   let changed = false;
@@ -3370,7 +3458,10 @@ function ensureOperatorIds(list){
       changed = true;
     }
   });
-  if(changed) saveOperators(ops);
+  if(changed){
+    cachedOperators = ops;
+    saveOperatorsLocal(ops);
+  }
   return ops;
 }
 function esc2(s){ return esc(s ?? ""); }
@@ -3564,13 +3655,14 @@ function renderOperatorsList(){
   });
 
   wrap.querySelectorAll("button[data-opdel]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
+    btn.addEventListener("click", async ()=>{
       const id = btn.getAttribute("data-opdel");
       const op = ops.find(x=>x.id===id);
       if(!op) return;
       if(!confirm(`Eliminare l'operatore "${formatOperator(op)}"?`)) return;
       const next = ops.filter(x=>x.id!==id);
       saveOperators(next);
+      try{ await deleteOperatorCloud(id); }catch(_){ }
       renderOperatorsList();
       resetOperatorForm();
       try{ renderOperatorPickers(); }catch(_){}
@@ -3768,6 +3860,8 @@ async function buildAllProductsRows(){
   });
 }
 
+
+window.addEventListener("load", ()=>{ syncOperatorsFromCloud(); });
 window.addEventListener("resize", ()=> {
   clearTimeout(window.__apResizeT);
   window.__apResizeT = setTimeout(applyAllProductsUI, 120);
