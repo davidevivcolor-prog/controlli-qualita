@@ -453,6 +453,7 @@
                 <th>Lotto</th>
                 <th>Effettuato da</th>
                 <th class="right">Apri</th>
+    <th class="right">Elimina</th>
                 <th class="right">Elimina</th>
               </tr>
             </thead>
@@ -790,75 +791,135 @@
         <div class="muted" style="margin-top:10px">
           Campi modificati / indicati con <b>*</b>. Ogni controllo tiene traccia della modifica (quando + valore precedente).
         </div>
+      <!-- OPERATORS -->
+      <div id="viewOperators" class="hide">
+        <div class="topline">
+          <div>
+            <div class="muted">Admin</div>
+            <div class="title">Gestione operatori</div>
+          </div>
+          <div class="btns" style="margin-top:0">
+            <button id="operatorsBackBtn">Home</button>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="topline">
+          <div>
+            <div class="muted" id="opFormMode">Aggiungi</div>
+            <div class="title" id="opFormTitle">Nuovo operatore</div>
+          </div>
+          <span class="tag">Local</span>
+        </div>
+
+        <input id="opEditId" type="hidden" />
+
+        <div class="row2" style="margin-top:10px">
+          <div>
+            <label style="margin-top:0">Ruolo</label>
+            <select id="operatorRole">
+              <option value="produzione">Produzione</option>
+              <option value="qualita">Qualità</option>
+            </select>
+          </div>
+          <div>
+            <label style="margin-top:0">Sigla</label>
+            <input id="opCode" placeholder="Es. DM / PD / ..." />
+          </div>
+        </div>
+
+        <div class="row2" style="margin-top:10px">
+          <div>
+            <label style="margin-top:0">Cognome</label>
+            <input id="opSurname" placeholder="Cognome" />
+          </div>
+          <div>
+            <label style="margin-top:0">Nome</label>
+            <input id="opName" placeholder="Nome" />
+          </div>
+        </div>
+
+        <div class="btns">
+          <button class="primary" id="saveOperatorBtn">Salva</button>
+          <button id="cancelEditOperatorBtn" class="secondary hide">Annulla</button>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="topline">
+          <div>
+            <div class="muted">Elenco</div>
+            <div class="title">Operatori salvati</div>
+          </div>
+          <span class="tag">Usati nei controlli</span>
+        </div>
+
+        <div id="operatorsList" style="margin-top:12px"></div>
       </div>
+
+      <!-- OPERATOR HISTORY -->
+      <div id="viewOperatorHistory" class="hide">
+        <div class="topline">
+          <div>
+            <div class="muted">Storico operatore</div>
+            <div class="title" id="opHistTitle">—</div>
+            <div class="muted" id="opHistMeta">—</div>
+          </div>
+          <div class="btns" style="margin-top:0">
+            <button id="backToOperatorsBtn">Indietro</button>
+          </div>
+        </div>
+
+        <div class="kpi" style="margin-top:12px">
+          <div class="box"><b id="opKpiChecks">0</b><span class="muted">Controlli</span></div>
+          <div class="box"><b id="opKpiOk">0</b><span class="muted">OK</span></div>
+          <div class="box"><b id="opKpiOut">0</b><span class="muted">Fuori STD</span></div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="topline">
+          <div>
+            <div class="muted">Prodotti</div>
+            <div class="title">Dettaglio per prodotto</div>
+          </div>
+          <span class="tag">Conteggi</span>
+        </div>
+
+        <div id="opProductsBreakdown" style="margin-top:12px"></div>
+
+        <div class="hr"></div>
+
+        <div class="topline">
+          <div>
+            <div class="muted">Ultimi controlli</div>
+            <div class="title">Lista (max 100)</div>
+          </div>
+        </div>
+
+        <div class="tableWrap" style="margin-top:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Prodotto</th>
+                <th>Lotto</th>
+                <th>Esito</th>
+                <th class="right">Apri</th>
+              </tr>
+            </thead>
+            <tbody id="opHistBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+</div>
 
     </div>
   </div>
-  <!-- OPERATORS -->
-  <div id="viewOperators" class="hide">
-    <div class="topline">
-      <div>
-        <div class="muted">Admin</div>
-        <div class="title">Gestione operatori</div>
-      </div>
-      <div class="btns" style="margin-top:0">
-        <button id="operatorsBackBtn">Home</button>
-      </div>
-    </div>
 
-    <div class="hr"></div>
-
-    <div class="topline">
-      <div>
-        <div class="muted">Aggiungi</div>
-        <div class="title">Nuovo operatore</div>
-      </div>
-      <span class="tag">Local</span>
-    </div>
-
-    <div class="row2" style="margin-top:10px">
-      <div>
-        <label style="margin-top:0">Ruolo</label>
-        <select id="operatorRole">
-          <option value="produzione">Produzione</option>
-          <option value="qualita">Qualità</option>
-        </select>
-      </div>
-      <div>
-        <label style="margin-top:0">Sigla</label>
-        <input id="opCode" placeholder="Es. DM / PD / ..." />
-      </div>
-    </div>
-
-    <div class="row2" style="margin-top:10px">
-      <div>
-        <label style="margin-top:0">Cognome</label>
-        <input id="opSurname" placeholder="Cognome" />
-      </div>
-      <div>
-        <label style="margin-top:0">Nome</label>
-        <input id="opName" placeholder="Nome" />
-      </div>
-    </div>
-
-    <div class="btns">
-      <button class="primary" id="saveOperatorBtn">Salva operatore</button>
-    </div>
-
-    <div class="hr"></div>
-
-    <div class="topline">
-      <div>
-        <div class="muted">Elenco</div>
-        <div class="title">Operatori salvati</div>
-      </div>
-      <span class="tag">Usati nei controlli</span>
-    </div>
-
-    <div id="operatorsList" style="margin-top:12px"></div>
-  </div>
-
-
+  <div 
   <!-- CoA (Certificato di Analisi) Modal -->
   <div id="coaOverlay" class="overlay hide" aria-hidden="true">
     <div class="modal">
@@ -1711,6 +1772,7 @@ const views = {
   history: document.getElementById("viewHistory"),
   detail: document.getElementById("viewCheckDetail"),
   operators: document.getElementById("viewOperators"),
+  operatorHistory: document.getElementById("viewOperatorHistory"),
 };
 function showView(name){
   // UI a viste dinamiche: alcune view possono non esistere (null)
@@ -2008,6 +2070,7 @@ function renderLastChecks5(product, checks){
       <td class="mono">${esc(chk.meta?.prodottoDa ?? "")}</td>
       <td class="mono">${esc(chk.meta?.effettuatoDa ?? "")}</td>
       <td class="right"><button class="smallbtn secondary" data-open="${esc(chk.id)}">Apri</button></td>
+      <td class="right"><button class="smallbtn danger" data-delcheck="${esc(chk.id)}">Elimina</button></td>
 `;
     body.appendChild(tr);
   }
@@ -3123,23 +3186,48 @@ on("addCustomControlBtnNew","click",()=> addCustomControl("new"));
 on("addCustomControlBtnEdit","click",()=> addCustomControl("edit"));
 
 on("newCheckBtn","click",startNewCheck);
-on("operatorsBtn","click",()=>{ renderOperatorsList(); showView("operators"); });
+on("operatorsBtn","click",()=>{ renderOperatorsList(); resetOperatorForm(); showView("operators"); });
 on("operatorsBackBtn","click",()=> showView("home"));
+on("backToOperatorsBtn","click",()=>{ renderOperatorsList(); showView("operators"); });
+
+on("cancelEditOperatorBtn","click",()=>{ resetOperatorForm(); });
+
 on("saveOperatorBtn","click",()=>{
   const role = (document.getElementById("operatorRole").value||"").trim();
   const name = (document.getElementById("opName").value||"").trim();
   const surname = (document.getElementById("opSurname").value||"").trim();
   const code = (document.getElementById("opCode").value||"").trim();
+  const editId = (document.getElementById("opEditId").value||"").trim();
+
   if(!role || !name || !surname || !code) return alert("Compila ruolo, nome, cognome e sigla.");
-  const list = loadOperators();
+
+  const list = ensureOperatorIds(loadOperators());
+
+  // blocco duplicati: stessa sigla + cognome + nome (case-insensitive), ma permette quello in modifica
   const formatted = formatOperator({role,name,surname,code});
-  const exists = list.some(o=> formatOperator(o)===formatted);
+  const exists = list.some(o=> (o.id!==editId) && normOp(formatOperator(o))===normOp(formatted));
   if(exists) return alert("Operatore già presente.");
-  list.push({ role, name, surname, code });
-  saveOperators(list);
-  renderOperatorsList();
-  alert("Operatore salvato ✅");
+
+  if(editId){
+    const idx = list.findIndex(o=>o.id===editId);
+    if(idx<0) return alert("Operatore non trovato (forse cancellato).");
+    list[idx] = { ...list[idx], role, name, surname, code };
+    saveOperators(list);
+    renderOperatorsList();
+    resetOperatorForm();
+    alert("Operatore aggiornato ✅");
+  } else {
+    list.push({ id: genId(), role, name, surname, code });
+    saveOperators(list);
+    renderOperatorsList();
+    resetOperatorForm();
+    alert("Operatore salvato ✅");
+  }
+
+  // aggiorna anche i picker nei controlli
+  try{ renderOperatorPickers(); }catch(_){}
 });
+
 on("cancelCheckBtn","click",async ()=> loadProduct(currentCode));
 on("saveCheckBtn","click",saveCheck);
 
@@ -3160,6 +3248,8 @@ on("filterTo","change",renderHistory);
 on("detailBackBtn","click",async ()=>{
   if(lastReturnView === "history"){
     showView("history");
+  } else if(lastReturnView === "operatorHistory"){
+    showView("operatorHistory");
   } else {
     await loadProduct(currentCode);
   }
@@ -3260,12 +3350,27 @@ on("wipeBtn","click",async ()=>{
 ========================= */
 const OPERATORS_KEY = "vivcolor_operators_v1";
 
+function genId(){
+  return "op_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,8);
+}
 function loadOperators(){
   try{ return JSON.parse(localStorage.getItem(OPERATORS_KEY) || "[]"); }
   catch(_){ return []; }
 }
 function saveOperators(list){
   localStorage.setItem(OPERATORS_KEY, JSON.stringify(list || []));
+}
+function ensureOperatorIds(list){
+  const ops = Array.isArray(list) ? list : [];
+  let changed = false;
+  ops.forEach(o=>{
+    if(!o.id){
+      o.id = genId();
+      changed = true;
+    }
+  });
+  if(changed) saveOperators(ops);
+  return ops;
 }
 function esc2(s){ return esc(s ?? ""); }
 function normOp(s){ return (s||"").toString().trim().toLowerCase(); }
@@ -3275,33 +3380,210 @@ function formatOperator(o){
   const name = (o.name||"").trim();
   return `${code} - ${surname} ${name}`.replace(/\s+/g," ").trim();
 }
-function isOperatorInList(input, list){
-  const n = normOp(input);
-  return list.some(x => normOp(x) === n);
+
+function resetOperatorForm(){
+  const idEl = document.getElementById("opEditId");
+  const roleEl = document.getElementById("operatorRole");
+  const codeEl = document.getElementById("opCode");
+  const surEl = document.getElementById("opSurname");
+  const nameEl = document.getElementById("opName");
+  const cancelBtn = document.getElementById("cancelEditOperatorBtn");
+  const modeEl = document.getElementById("opFormMode");
+  const titleEl = document.getElementById("opFormTitle");
+
+  if(idEl) idEl.value = "";
+  if(roleEl) roleEl.value = "produzione";
+  if(codeEl) codeEl.value = "";
+  if(surEl) surEl.value = "";
+  if(nameEl) nameEl.value = "";
+
+  if(cancelBtn) cancelBtn.classList.add("hide");
+  if(modeEl) modeEl.textContent = "Aggiungi";
+  if(titleEl) titleEl.textContent = "Nuovo operatore";
 }
+
+function startEditOperator(op){
+  if(!op) return;
+  document.getElementById("opEditId").value = op.id || "";
+  document.getElementById("operatorRole").value = (op.role||"produzione");
+  document.getElementById("opCode").value = (op.code||"");
+  document.getElementById("opSurname").value = (op.surname||"");
+  document.getElementById("opName").value = (op.name||"");
+  document.getElementById("cancelEditOperatorBtn").classList.remove("hide");
+  document.getElementById("opFormMode").textContent = "Modifica";
+  document.getElementById("opFormTitle").textContent = "Operatore";
+  // scroll soft verso form
+  try{ window.scrollTo({ top:0, behavior:"smooth" }); }catch(_){}
+}
+
+async function openOperatorHistory(opId){
+  const ops = ensureOperatorIds(loadOperators());
+  const op = ops.find(o=>o.id===opId);
+  if(!op) return alert("Operatore non trovato.");
+  await renderOperatorHistory(op);
+  showView("operatorHistory");
+}
+
+async function renderOperatorHistory(op){
+  const title = document.getElementById("opHistTitle");
+  const meta  = document.getElementById("opHistMeta");
+  const body  = document.getElementById("opHistBody");
+  const breakdown = document.getElementById("opProductsBreakdown");
+  const kChecks = document.getElementById("opKpiChecks");
+  const kOk = document.getElementById("opKpiOk");
+  const kOut = document.getElementById("opKpiOut");
+
+  if(title) title.textContent = formatOperator(op);
+  if(meta) meta.textContent = `Ruolo: ${(op.role||"").toUpperCase()}`;
+
+  if(body) body.innerHTML = "";
+  if(breakdown) breakdown.innerHTML = '<div class="muted">Caricamento…</div>';
+  if(kChecks) kChecks.textContent = "0";
+  if(kOk) kOk.textContent = "0";
+  if(kOut) kOut.textContent = "0";
+
+  // Match: usiamo la stringa che viene salvata nei controlli (es. "DM - Rossi Mario")
+  const key = formatOperator(op);
+
+  let checks = [];
+  try{
+    // Prefer query indicizzata su campo nested
+    const q1 = query(collection(fs, COL_CHECKS), where("meta.effettuatoDa","==", key));
+    const snap = await getDocs(q1);
+    checks = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+  }catch(err){
+    console.warn("Query by meta.effettuatoDa failed, fallback:", err);
+    try{
+      // Fallback: scarico e filtro client-side (ok per dataset piccoli/medi)
+      const snap = await getDocs(collection(fs, COL_CHECKS));
+      checks = snap.docs.map(d=>({ id:d.id, ...d.data() }))
+        .filter(c => (c.meta?.effettuatoDa||"") === key);
+    }catch(err2){
+      console.error(err2);
+      if(breakdown) breakdown.innerHTML = '<div class="muted">Errore nel caricare lo storico.</div>';
+      return;
+    }
+  }
+
+  // Ordina per data (desc)
+  checks.sort((a,b)=> (b.dateISO||"").localeCompare(a.dateISO||""));
+
+  const total = checks.length;
+  const ok = checks.filter(c => (c.outcome||"") === "OK").length;
+  const out = checks.filter(c => (c.outcome||"") && (c.outcome||"") !== "OK").length;
+
+  if(kChecks) kChecks.textContent = String(total);
+  if(kOk) kOk.textContent = String(ok);
+  if(kOut) kOut.textContent = String(out);
+
+  // Breakdown per prodotto
+  const byProd = new Map();
+  for(const c of checks){
+    const code = c.code || "—";
+    byProd.set(code, (byProd.get(code)||0)+1);
+  }
+  const prodRows = [...byProd.entries()].sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
+  if(breakdown){
+    breakdown.innerHTML = prodRows.length ? prodRows.map(([code,count])=>`
+      <div class="controlCard" style="margin-top:10px">
+        <div class="topline" style="margin-top:0">
+          <div>
+            <div class="muted">Prodotto</div>
+            <div class="title mono">${esc2(code)}</div>
+          </div>
+          <span class="tag">${count} controlli</span>
+        </div>
+      </div>
+    `).join("") : '<div class="muted">Nessun controllo trovato per questo operatore.</div>';
+  }
+
+  // Lista ultimi 100 controlli
+  const list = checks.slice(0,100);
+  if(body){
+    body.innerHTML = list.map(c=>`
+      <tr>
+        <td class="mono">${esc2(c.dateISO||"")}</td>
+        <td class="mono">${esc2(c.code||"")}</td>
+        <td class="mono">${esc2(c.batch||"")}</td>
+        <td><span class="pill ${((c.outcome||"")==="OK")?"ok":"bad"}">${esc2(c.outcome||"")}</span></td>
+        <td class="right"><button class="smallbtn secondary" data-open="${esc2(c.id)}">Apri</button></td>
+      </tr>
+    `).join("") || `<tr><td colspan="5" class="muted">—</td></tr>`;
+
+    body.querySelectorAll("button[data-open]").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        lastReturnView = "operatorHistory";
+        await openCheckDetailPage(btn.getAttribute("data-open"));
+      });
+    });
+  }
+}
+
 function renderOperatorsList(){
   const wrap = document.getElementById("operatorsList");
   if(!wrap) return;
-  const ops = loadOperators();
+  const ops = ensureOperatorIds(loadOperators());
 
   if(!ops.length){
     wrap.innerHTML = '<div class="muted">Nessun operatore salvato. Aggiungine uno sopra 👆</div>';
     return;
   }
 
-  // Raggruppo
-  const prod = ops.filter(o=> (o.role||"").toLowerCase()==="produzione");
-  const qc   = ops.filter(o=> (o.role||"").toLowerCase()==="qualita");
+  // ordine: ruolo, poi cognome/nome
+  ops.sort((a,b)=>{
+    const ra = normOp(a.role), rb = normOp(b.role);
+    if(ra!==rb) return ra.localeCompare(rb);
+    const sa = normOp(a.surname), sb = normOp(b.surname);
+    if(sa!==sb) return sa.localeCompare(sb);
+    return normOp(a.name).localeCompare(normOp(b.name));
+  });
 
-  const renderGroup = (title, arr)=>`
+  wrap.innerHTML = ops.map(o=>`
     <div class="controlCard" style="margin-top:10px">
-      <b>${esc2(title)}</b>
-      <div class="muted" style="margin-top:6px">${arr.length ? arr.map(o=>`<div>• <span class="mono">${esc2((o.code||"").trim())}</span> — ${esc2((o.surname||"").trim())} ${esc2((o.name||"").trim())}</div>`).join("") : "—"}</div>
+      <div class="topline" style="margin-top:0">
+        <div>
+          <div class="muted">${esc2((o.role||"").toUpperCase())}</div>
+          <div class="title"><span class="mono">${esc2((o.code||"").trim())}</span> — ${esc2((o.surname||"").trim())} ${esc2((o.name||"").trim())}</div>
+        </div>
+        <div class="btns" style="margin-top:0">
+          <button class="secondary smallbtn" data-ophist="${esc2(o.id)}">Storico</button>
+          <button class="secondary smallbtn" data-opedit="${esc2(o.id)}">Modifica</button>
+          <button class="danger smallbtn" data-opdel="${esc2(o.id)}">Elimina</button>
+        </div>
+      </div>
     </div>
-  `;
+  `).join("");
 
-  wrap.innerHTML = renderGroup("Produzione", prod) + renderGroup("Qualità", qc);
+  wrap.querySelectorAll("button[data-opedit]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.getAttribute("data-opedit");
+      const op = ops.find(x=>x.id===id);
+      startEditOperator(op);
+    });
+  });
+
+  wrap.querySelectorAll("button[data-opdel]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.getAttribute("data-opdel");
+      const op = ops.find(x=>x.id===id);
+      if(!op) return;
+      if(!confirm(`Eliminare l'operatore "${formatOperator(op)}"?`)) return;
+      const next = ops.filter(x=>x.id!==id);
+      saveOperators(next);
+      renderOperatorsList();
+      resetOperatorForm();
+      try{ renderOperatorPickers(); }catch(_){}
+    });
+  });
+
+  wrap.querySelectorAll("button[data-ophist]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.getAttribute("data-ophist");
+      await openOperatorHistory(id);
+    });
+  });
 }
+
 
 function renderOperatorPickers(){
   const ops = loadOperators();
