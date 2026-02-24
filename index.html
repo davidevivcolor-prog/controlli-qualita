@@ -3866,7 +3866,6 @@ function ensureOperatorIds(list){
   // legacy wrapper: assicura id stabili e dedup
   return normalizeOperators(list, []);
 }
-function esc(s){ return esc(s ?? ""); }
 function normOp(s){ return (s||"").toString().trim().toLowerCase(); }
 
 // Verifica se un operatore inserito a mano è già presente nell'elenco.
