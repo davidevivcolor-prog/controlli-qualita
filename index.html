@@ -133,6 +133,8 @@
 
     .hide{ display:none !important; }
     .row2{ display:flex; gap:10px; flex-wrap:wrap; }
+    .row3{ display:grid; gap:10px; grid-template-columns:1fr; }
+    @media(min-width:760px){ .row3{ grid-template-columns:repeat(3,1fr); } }
     .row2 > *{ flex:1 1 260px; min-width:260px; }
 
     .pill{
@@ -345,6 +347,7 @@
         <button class="primary" id="openBtn">Apri</button>
         <button id="homeBtn">Home</button>
         <button class="secondary" id="allProductsBtn">Tutti i prodotti</button>
+        <button class="secondary" id="statsBtn">Statistiche</button>
       </div>
 
       <div class="hr"></div>
@@ -547,6 +550,99 @@
           </table>
         </div>
       </div>
+
+
+<!-- STATS -->
+<div id="viewStats" class="hide">
+  <div class="topline">
+    <div>
+      <div class="muted">Dashboard</div>
+      <div class="title">Statistiche</div>
+    </div>
+    <div class="btns" style="margin-top:0">
+      <button id="statsBackBtn">Home</button>
+    </div>
+  </div>
+
+  <div class="hr"></div>
+
+  <div class="row2">
+    <div>
+      <label>Modalità</label>
+      <select id="statsMode">
+        <option value="month">Mensile</option>
+        <option value="year">Annuale</option>
+      </select>
+    </div>
+    <div>
+      <label>Periodo</label>
+      <input id="statsPeriod" type="month" />
+      <input id="statsYear" type="number" min="2020" max="2100" class="hide" />
+    </div>
+  </div>
+
+  <div class="btns" style="margin-top:10px">
+    <button class="primary" id="statsRunBtn">Aggiorna</button>
+  </div>
+
+  <div class="hr"></div>
+
+  <div class="row3">
+    <div class="card" style="padding:12px">
+      <div class="muted">Controlli</div>
+      <div class="title" id="stTotal">0</div>
+    </div>
+    <div class="card" style="padding:12px">
+      <div class="muted">OK</div>
+      <div class="title" id="stOk">0</div>
+    </div>
+    <div class="card" style="padding:12px">
+      <div class="muted">Fuori STD</div>
+      <div class="title" id="stOut">0</div>
+    </div>
+  </div>
+
+  <div class="row3" style="margin-top:10px">
+    <div class="card" style="padding:12px">
+      <div class="muted">Corretti</div>
+      <div class="title" id="stCorrected">0</div>
+    </div>
+    <div class="card" style="padding:12px">
+      <div class="muted">Media controlli/giorno</div>
+      <div class="title" id="stPerDay">0</div>
+    </div>
+    <div class="card" style="padding:12px">
+      <div class="muted">Prodotti unici</div>
+      <div class="title" id="stUniqueCodes">0</div>
+    </div>
+  </div>
+
+  <div class="hr"></div>
+
+  <div class="topline">
+    <div>
+      <div class="muted">Top codici</div>
+      <div class="title">I più controllati</div>
+    </div>
+    <span class="tag">Top 10</span>
+  </div>
+  <div id="stTopCodes" style="margin-top:10px"></div>
+
+  <div class="hr"></div>
+
+  <div class="topline">
+    <div>
+      <div class="muted">Andamento</div>
+      <div class="title">Controlli per giorno</div>
+    </div>
+  </div>
+  <div class="tableWrap" style="margin-top:10px">
+    <table>
+      <thead><tr><th>Data</th><th class="right">N° controlli</th><th class="right">OK</th><th class="right">Fuori STD</th></tr></thead>
+      <tbody id="stByDay"></tbody>
+    </table>
+  </div>
+</div>
 
       <!-- NEW PRODUCT -->
       <div id="viewNewProduct" class="hide">
@@ -1068,8 +1164,20 @@ import {
   collection, doc,
   getDoc, setDoc, deleteDoc,
   getDocs,
-  query, where, orderBy, limit
+  query, where, orderBy, limit,
+  startAfter,
+  getCountFromServer,
+  updateDoc,
+  increment
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+
+
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.12.4/firebase-storage.js";
 
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app-check.js";
 
@@ -1092,6 +1200,8 @@ initializeAppCheck(app, {
   isTokenAutoRefreshEnabled: true
 });
 const fs = getFirestore(app);
+const storage = getStorage(app);
+
 
 // Collections
 const COL_PRODUCTS = "products";
@@ -1277,6 +1387,27 @@ function fileToBase64(file){
   });
 }
 
+
+
+/* =========================
+   Allegati PDF (Storage)
+========================= */
+async function uploadAttachmentToStorage({ checkId, key, file }){
+  if(!file) return null;
+  const safeName = (file.name || "allegato.pdf").replace(/[\\/]+/g,"_");
+  const path = `attachments/${checkId}/${key}/${Date.now()}_${safeName}`;
+  const r = storageRef(storage, path);
+  await uploadBytes(r, file, { contentType: file.type || "application/pdf" });
+  const url = await getDownloadURL(r);
+  return { attachmentName: safeName, attachmentUrl: url, attachmentPath: path, attachmentBytes: file.size || null };
+}
+
+async function fetchBytesFromUrl(url){
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Impossibile scaricare allegato: " + res.status);
+  const buf = await res.arrayBuffer();
+  return new Uint8Array(buf);
+}
 
 /* =========================
    PDF: Certificazioni ΔE / Resa
@@ -1487,8 +1618,10 @@ async function buildCertificatePdfBytes({ kind, product, check, result, specLabe
 async function buildMergedCertificatePdf({ kind, product, check, result, specLabel }){
   const certBytes = await buildCertificatePdfBytes({ kind, product, check, result, specLabel });
 
+  const attachUrl = result?.attachmentUrl;
   const attachB64 = result?.attachmentB64;
-  if(!attachB64){
+
+  if(!attachUrl && !attachB64){
     return new Uint8Array(certBytes);
   }
 
@@ -1500,7 +1633,7 @@ async function buildMergedCertificatePdf({ kind, product, check, result, specLab
   certPages.forEach(p=>merged.addPage(p));
 
   try{
-    const attBytes = base64ToUint8Array(attachB64);
+    const attBytes = attachUrl ? await fetchBytesFromUrl(attachUrl) : base64ToUint8Array(attachB64);
     const attDoc = await PDFDocument.load(attBytes);
     const attPages = await merged.copyPages(attDoc, attDoc.getPageIndices());
     attPages.forEach(p=>merged.addPage(p));
@@ -1791,6 +1924,7 @@ async function buildCoAPdfBytes({ product, check, selectedKeys, expiryDate, incl
 const views = {
   home: document.getElementById("viewHome"),
   allProducts: document.getElementById("viewAllProducts"),
+  stats: document.getElementById("viewStats"),
   product: document.getElementById("viewProduct"),
   newProduct: document.getElementById("viewNewProduct"),
   setup: document.getElementById("viewSetup"),
@@ -1814,30 +1948,55 @@ function showView(name){
 /* =========================
    KPI + Home Widgets
 ========================= */
+
 async function refreshKPIs(){
-  const t = tx([STORES.products, STORES.checks]);
-  const products = await getAll(t.objectStore(STORES.products));
-  const checks = await getAll(t.objectStore(STORES.checks));
-  document.getElementById("kpiProducts").textContent = products.length;
-  document.getElementById("kpiChecks").textContent = checks.length;
+  try{
+    const prodCountSnap = await getCountFromServer(collection(fs, COL_PRODUCTS));
+    const checkCountSnap = await getCountFromServer(collection(fs, COL_CHECKS));
+    document.getElementById("kpiProducts").textContent = prodCountSnap.data().count;
+    document.getElementById("kpiChecks").textContent = checkCountSnap.data().count;
+  }catch(err){
+    // fallback (meno efficiente)
+    const t = tx([STORES.products, STORES.checks]);
+    const products = await getAll(t.objectStore(STORES.products));
+    const checks = await getAll(t.objectStore(STORES.checks));
+    document.getElementById("kpiProducts").textContent = products.length;
+    document.getElementById("kpiChecks").textContent = checks.length;
+  }
 }
+
 
 async function renderHomeRecentProducts(){
   const box = document.getElementById("homeRecentProducts");
   box.innerHTML = "";
 
-  const t = tx([STORES.products, STORES.checks]);
-  const products = await getAll(t.objectStore(STORES.products));
-  const checks = await getAll(t.objectStore(STORES.checks));
-
-  checks.sort((a,b)=> (b.dateISO||"").localeCompare(a.dateISO||""));
+  // prendo ultimi controlli (limitati), poi estraggo max 5 codici unici
+  let recentChecks = [];
+  try{
+    const qy = query(collection(fs, COL_CHECKS), orderBy("dateISO","desc"), limit(30));
+    const snap = await getDocs(qy);
+    recentChecks = snap.docs.map(d=>d.data());
+  }catch(err){
+    console.warn("renderHomeRecentProducts query failed, fallback:", err);
+    const t = tx([STORES.checks]);
+    recentChecks = await getAll(t.objectStore(STORES.checks));
+    recentChecks.sort((a,b)=> (b.dateISO||"").localeCompare(a.dateISO||""));
+    recentChecks = recentChecks.slice(0,30);
+  }
 
   const seen = new Set();
   const rows = [];
-  for(const c of checks){
+  for(const c of recentChecks){
+    if(!c?.code) continue;
     if(seen.has(c.code)) continue;
     seen.add(c.code);
-    const p = products.find(x=>x.code===c.code);
+
+    let p = null;
+    try{
+      const ps = await getDoc(doc(fs, COL_PRODUCTS, c.code));
+      p = ps.exists() ? ps.data() : null;
+    }catch(_){}
+
     rows.push({
       code: c.code,
       name: p?.name ?? "",
@@ -1876,7 +2035,8 @@ async function renderHomeRecentProducts(){
   });
 }
 
-function renderAllProductsTable(rows){
+function renderAllProductsTable
+(rows){
   const body = document.getElementById("allProductsBody");
   if(!body) return;
   body.innerHTML = "";
@@ -2539,10 +2699,12 @@ async function saveCheck(){
   const p = cachedProduct;
   if(!p) return;
 
+  const checkId = uuid();
+
   const dateLocal = document.getElementById("checkDate").value;
   const dateISO = new Date(dateLocal).toISOString();
 
-  const lotto = document.getElementById("checkLotto").value.trim();
+  const lotto = document.getElementById("checkLotto").value.trim().toUpperCase();
   if(!lotto) return alert("Il lotto è obbligatorio.");
 
   const okDup = await confirmDuplicateLottoIfNeeded(lotto);
@@ -2576,19 +2738,29 @@ async function saveCheck(){
     const ok = evaluateValueAgainstSpec(c, v);
     if(!ok) anyOut = true;
 
-    // Allegati PDF (solo ΔE / Resa)
+    // Allegati PDF (solo ΔE / Resa) — su Storage (evita limite 1MB Firestore)
     let attachmentName = null;
-    let attachmentB64 = null;
+    let attachmentUrl = null;
+    let attachmentPath = null;
+    let attachmentBytes = null;
     if(c.key==="deltae" || c.key==="resa"){
       const fInp = document.querySelector(`#checkRows input[type="file"][data-file="${CSS.escape(c.key)}"]`);
       const file = fInp?.files?.[0] || null;
       if(file){
-        attachmentName = file.name || "allegato.pdf";
-        attachmentB64 = await fileToBase64(file);
+        try{
+          const up = await uploadAttachmentToStorage({ checkId, key: c.key, file });
+          attachmentName = up?.attachmentName ?? (file.name || "allegato.pdf");
+          attachmentUrl = up?.attachmentUrl ?? null;
+          attachmentPath = up?.attachmentPath ?? null;
+          attachmentBytes = up?.attachmentBytes ?? null;
+        }catch(err){
+          console.error(err);
+          alert("Errore caricamento PDF allegato (prova a rinominare/ricomprimere il file): " + (err?.message || err));
+        }
       }
     }
 
-    results.push({ key:c.key, name:c.name, value:v, unit:c.unit ?? "", ok, specText: specText(c), attachmentName, attachmentB64 });
+    results.push({ key:c.key, name:c.name, value:v, unit:c.unit ?? "", ok, specText: specText(c), attachmentName, attachmentUrl, attachmentPath, attachmentBytes });
   }
   // Conferme: dati mancanti (tranne lotto) + operatori non presenti in elenco
   const missingMeta = [];
@@ -2625,11 +2797,14 @@ const resultsSan = (results||[]).map(r=>({
   ok: !!r.ok,
   specText: String(r.specText||""),
   attachmentName: (r.attachmentName ? String(r.attachmentName) : null),
+  attachmentUrl: (r.attachmentUrl ? String(r.attachmentUrl) : null),
+  attachmentPath: (r.attachmentPath ? String(r.attachmentPath) : null),
+  attachmentBytes: (r.attachmentBytes==null ? null : Number(r.attachmentBytes)),
   attachmentB64: (r.attachmentB64 ? String(r.attachmentB64) : null)
 }));
 
 const check = {
-  id: uuid(),
+  id: checkId,
   code: p.code,
   dateISO,
   lotto,
@@ -2642,6 +2817,40 @@ const check = {
 
   const t = tx([STORES.checks], "readwrite");
   await put(t.objectStore(STORES.checks), check);
+
+
+// Aggiorna statistiche prodotto (per rendere Home / Tutti i prodotti più veloci)
+try{
+  const pRef = doc(fs, COL_PRODUCTS, p.code);
+  await updateDoc(pRef, {
+    "stats.nChecks": increment(1),
+    "stats.nOk": increment(check.outcome==="OK" ? 1 : 0),
+    "stats.nOut": increment(check.outcome==="OK" ? 0 : 1),
+    "stats.nCorrected": increment(check.corretto ? 1 : 0),
+    "stats.lastDateISO": check.dateISO,
+    "stats.lastLot": check.lotto || "",
+    "stats.lastByQc": check.meta?.effettuatoDa || "",
+    "stats.lastByProd": check.meta?.prodottoDa || "",
+  });
+}catch(err){
+  // se il doc non esiste ancora o manca stats, fallback a setDoc merge
+  try{
+    await setDoc(doc(fs, COL_PRODUCTS, p.code), {
+      stats:{
+        nChecks: 1,
+        nOk: (check.outcome==="OK" ? 1 : 0),
+        nOut: (check.outcome==="OK" ? 0 : 1),
+        nCorrected: (check.corretto ? 1 : 0),
+        lastDateISO: check.dateISO,
+        lastLot: check.lotto || "",
+        lastByQc: check.meta?.effettuatoDa || "",
+        lastByProd: check.meta?.prodottoDa || ""
+      }
+    }, { merge:true });
+  }catch(err2){
+    console.warn("Impossibile aggiornare stats prodotto:", err2);
+  }
+}
 
   await refreshKPIs();
   await renderHomeRecentProducts();
@@ -3088,7 +3297,8 @@ async function generateCoAPdf(){
 async function saveDetail(){
   if(!detailCheck) return;
 
-  const lotto = String(detailCheck.lotto ?? "").trim();
+  const lotto = String(detailCheck.lotto ?? "").trim().toUpperCase();
+  detailCheck.lotto = lotto;
   if(!lotto) return alert("Il lotto è obbligatorio.");
 
   const okDup = await confirmDuplicateLottoIfNeeded(lotto, detailCheck.id);
@@ -3213,19 +3423,27 @@ on("codeInput","input",async (e)=>{
   await renderCodeSuggestions(q);
 });
 
+
 async function ensureAllProductsCache(){
-  if(Array.isArray(window.__allProductsCache) && window.__allProductsCache.length) return window.__allProductsCache;
+  // cache leggero: solo codice + nome (perfetto per autocomplete)
+  if(Array.isArray(window.__productsMiniCache) && window.__productsMiniCache.length) return window.__productsMiniCache;
   try{
-    const rows = await buildAllProductsRows();
-    window.__allProductsCache = rows;
+    const snap = await getDocs(collection(fs, COL_PRODUCTS));
+    const rows = snap.docs.map(d=>{
+      const p = d.data() || {};
+      return { code: (p.code||d.id||"").toString(), name: (p.name||"").toString() };
+    });
+    window.__productsMiniCache = rows;
     return rows;
-  }catch(_){
-    window.__allProductsCache = [];
+  }catch(err){
+    console.warn("ensureAllProductsCache failed:", err);
+    window.__productsMiniCache = [];
     return [];
   }
 }
 
-function hideCodeSuggestions(){
+function hideCodeSuggestions
+(){
   const box = document.getElementById("codeSuggest");
   if(!box) return;
   box.innerHTML = "";
@@ -3235,10 +3453,14 @@ async function renderCodeSuggestions(query){
   const box = document.getElementById("codeSuggest");
   if(!box) return;
 
+  window.__codeSuggestToken = (window.__codeSuggestToken||0) + 1;
+  const token = window.__codeSuggestToken;
+
   const q = (query||"").toUpperCase().trim();
   if(!q){ hideCodeSuggestions(); return; }
 
   const list = await ensureAllProductsCache();
+  if(token !== window.__codeSuggestToken) return;
   const hits = (list||[])
     .filter(p=> (p?.code||"").toUpperCase().startsWith(q))
     .slice(0,3);
@@ -3251,7 +3473,7 @@ async function renderCodeSuggestions(query){
   hits.forEach(p=>{
     const item = document.createElement("div");
     item.className = "item";
-    item.innerHTML = `<span class="code">${esc2((p.code||"").toUpperCase())}</span><span class="name">${esc2(p.name||"")}</span>`;
+    item.innerHTML = `<span class="code">${esc((p.code||"").toUpperCase())}</span><span class="name">${esc(p.name||"")}</span>`;
     item.addEventListener("mousedown",(ev)=>{
       ev.preventDefault();
       document.getElementById("codeInput").value = (p.code||"").toUpperCase();
@@ -3292,10 +3514,18 @@ on("allProductsBtn","click",async ()=>{
   showView("allProducts");
 });
 
+on("statsBtn","click",async ()=>{
+  await openStats();
+  showView("stats");
+});
+
 on("backFromAllProductsBtn","click",async ()=>{
   showView("home");
   await renderHomeRecentProducts();
 });
+
+on("statsBackBtn","click",()=> showView("home"));
+on("statsRunBtn","click",runStats);
 
 on("cancelNewProdBtn","click",()=> showView("home"));
 on("saveNewProdBtn","click",saveNewProduct);
@@ -3354,6 +3584,17 @@ on("saveOperatorBtn","click",async ()=>{
 
 on("cancelCheckBtn","click",async ()=> loadProduct(currentCode));
 on("saveCheckBtn","click",saveCheck);
+
+// Lotto sempre MAIUSCOLO (input live)
+const __lotInp = document.getElementById("checkLotto");
+if(__lotInp && !__lotInp.__boundUpper){
+  __lotInp.__boundUpper = true;
+  __lotInp.addEventListener("input", ()=>{
+    const p = __lotInp.selectionStart;
+    __lotInp.value = (__lotInp.value||"").toUpperCase();
+    try{ __lotInp.setSelectionRange(p,p); }catch(_){ }
+  });
+}
 
 on("historyBtn","click",async ()=>{
   if(!cachedProduct) return;
@@ -3625,7 +3866,7 @@ function ensureOperatorIds(list){
   // legacy wrapper: assicura id stabili e dedup
   return normalizeOperators(list, []);
 }
-function esc2(s){ return esc(s ?? ""); }
+function esc(s){ return esc(s ?? ""); }
 function normOp(s){ return (s||"").toString().trim().toLowerCase(); }
 
 // Verifica se un operatore inserito a mano è già presente nell'elenco.
@@ -3719,20 +3960,22 @@ async function renderOperatorHistory(op){
 
   // Match: usiamo la stringa che viene salvata nei controlli (es. "DM - Rossi Mario")
   const key = formatOperator(op);
+  const role = (op.role||"").toLowerCase();
+  const field = (role==="produzione") ? "meta.prodottoDa" : "meta.effettuatoDa";
 
   let checks = [];
   try{
     // Prefer query indicizzata su campo nested
-    const q1 = query(collection(fs, COL_CHECKS), where("meta.effettuatoDa","==", key));
+    const q1 = query(collection(fs, COL_CHECKS), where(field,"==", key));
     const snap = await getDocs(q1);
     checks = snap.docs.map(d=>({ id:d.id, ...d.data() }));
   }catch(err){
-    console.warn("Query by meta.effettuatoDa failed, fallback:", err);
+    console.warn("Query by "+field+" failed, fallback:", err);
     try{
       // Fallback: scarico e filtro client-side (ok per dataset piccoli/medi)
       const snap = await getDocs(collection(fs, COL_CHECKS));
       checks = snap.docs.map(d=>({ id:d.id, ...d.data() }))
-        .filter(c => (c.meta?.effettuatoDa||"") === key);
+        .filter(c => ((field==="meta.prodottoDa") ? (c.meta?.prodottoDa||"") : (c.meta?.effettuatoDa||"")) === key);
     }catch(err2){
       console.error(err2);
       if(breakdown) breakdown.innerHTML = '<div class="muted">Errore nel caricare lo storico.</div>';
@@ -3769,7 +4012,7 @@ async function renderOperatorHistory(op){
           <div class="topline" style="margin-top:0">
             <div>
               <div class="muted">Prodotto</div>
-              <div class="title mono">${esc2(code)}</div>
+              <div class="title mono">${esc(code)}</div>
             </div>
             <span class="tag">${count} controlli</span>
           </div>
@@ -3805,11 +4048,11 @@ async function renderOperatorHistory(op){
     if(body){
       body.innerHTML = list.map(c=>`
         <tr>
-          <td class="mono">${esc2(c.dateISO||"")}</td>
-          <td class="mono">${esc2(c.code||"")}</td>
-          <td class="mono">${esc2(c.lotto||"")}</td>
-          <td><span class="pill ${((c.outcome||"")==="OK")?"ok":"bad"}">${esc2(c.outcome||"")}</span>${c.corretto ? ' <span class="tag" title="Formula corretta tramite aggiunte">Corretto</span>' : ''}</td>
-          <td class="right"><button class="smallbtn secondary" data-open="${esc2(c.id)}">Apri</button></td>
+          <td class="mono">${esc(c.dateISO||"")}</td>
+          <td class="mono">${esc(c.code||"")}</td>
+          <td class="mono">${esc(c.lotto||"")}</td>
+          <td><span class="pill ${((c.outcome||"")==="OK")?"ok":"bad"}">${esc(c.outcome||"")}</span>${c.corretto ? ' <span class="tag" title="Formula corretta tramite aggiunte">Corretto</span>' : ''}</td>
+          <td class="right"><button class="smallbtn secondary" data-open="${esc(c.id)}">Apri</button></td>
         </tr>
       `).join("") || `<tr><td colspan="5" class="muted">—</td></tr>`;
 
@@ -3848,13 +4091,13 @@ function renderOperatorsList(){
     <div class="controlCard" style="margin-top:10px">
       <div class="topline" style="margin-top:0">
         <div>
-          <div class="muted">${esc2((o.role||"").toUpperCase())}</div>
-          <div class="title"><span class="mono">${esc2((o.code||"").trim())}</span> — ${esc2((o.surname||"").trim())} ${esc2((o.name||"").trim())}</div>
+          <div class="muted">${esc((o.role||"").toUpperCase())}</div>
+          <div class="title"><span class="mono">${esc((o.code||"").trim())}</span> — ${esc((o.surname||"").trim())} ${esc((o.name||"").trim())}</div>
         </div>
         <div class="btns" style="margin-top:0">
-          <button class="secondary smallbtn" data-ophist="${esc2(o.id)}">Storico</button>
-          <button class="secondary smallbtn" data-opedit="${esc2(o.id)}">Modifica</button>
-          <button class="danger smallbtn" data-opdel="${esc2(o.id)}">Elimina</button>
+          <button class="secondary smallbtn" data-ophist="${esc(o.id)}">Storico</button>
+          <button class="secondary smallbtn" data-opedit="${esc(o.id)}">Modifica</button>
+          <button class="danger smallbtn" data-opdel="${esc(o.id)}">Elimina</button>
         </div>
       </div>
     </div>
@@ -3909,14 +4152,14 @@ function renderOperatorPickers(){
 
   const fillList = (datalist, arr)=>{
     if(!datalist) return;
-    datalist.innerHTML = arr.map(x=>`<option value="${esc2(x)}"></option>`).join("");
+    datalist.innerHTML = arr.map(x=>`<option value="${esc(x)}"></option>`).join("");
   };
 
   const renderBtns = (wrap, arr, query, onPick)=>{
     if(!wrap) return;
     const q = normOp(query);
     const filtered = arr.filter(x=> !q || normOp(x).includes(q)).slice(0, 12);
-    wrap.innerHTML = filtered.map(x=>`<button type="button" class="smallbtn" data-op="${esc2(x)}">${esc2(x)}</button>`).join("") || '<span class="muted">—</span>';
+    wrap.innerHTML = filtered.map(x=>`<button type="button" class="smallbtn" data-op="${esc(x)}">${esc(x)}</button>`).join("") || '<span class="muted">—</span>';
     wrap.querySelectorAll("button[data-op]").forEach(b=>{
       b.addEventListener("click", ()=> onPick(b.getAttribute("data-op")));
     });
@@ -4045,40 +4288,199 @@ async function deleteProductFlow(code){
   }
 }
 
-async function buildAllProductsRows(){
-  const t = tx([STORES.products, STORES.checks]);
-  const products = await getAll(t.objectStore(STORES.products));
-  const checks = await getAll(t.objectStore(STORES.checks));
 
-  const map = new Map();
+
+/* =========================
+   Statistiche (mensili / annuali)
+========================= */
+function isoStartOfDay(d){
+  const x = new Date(d);
+  x.setHours(0,0,0,0);
+  return x.toISOString();
+}
+function isoEndExclusive(d){
+  const x = new Date(d);
+  x.setHours(0,0,0,0);
+  x.setDate(x.getDate()+1);
+  return x.toISOString();
+}
+
+async function fetchChecksInRange(startISO, endISO){
+  const out = [];
+  let last = null;
+  while(true){
+    let qy = query(
+      collection(fs, COL_CHECKS),
+      where("dateISO", ">=", startISO),
+      where("dateISO", "<", endISO),
+      orderBy("dateISO","asc"),
+      limit(800)
+    );
+    if(last) qy = query(qy, startAfter(last));
+    const snap = await getDocs(qy);
+    if(snap.empty) break;
+    snap.docs.forEach(d=> out.push(d.data()));
+    last = snap.docs[snap.docs.length-1];
+    if(snap.docs.length < 800) break;
+  }
+  return out;
+}
+
+async function openStats(){
+  // default: mese corrente
+  const now = new Date();
+  const m = String(now.getMonth()+1).padStart(2,"0");
+  const y = now.getFullYear();
+  const periodEl = document.getElementById("statsPeriod");
+  const yearEl = document.getElementById("statsYear");
+  if(periodEl && !periodEl.value) periodEl.value = `${y}-${m}`;
+  if(yearEl && !yearEl.value) yearEl.value = String(y);
+
+  // bind toggle UI una volta
+  const modeEl = document.getElementById("statsMode");
+  if(modeEl && !modeEl.__bound){
+    modeEl.__bound = true;
+    modeEl.addEventListener("change", ()=>{
+      const mode = modeEl.value;
+      const p = document.getElementById("statsPeriod");
+      const yy = document.getElementById("statsYear");
+      if(mode==="year"){
+        p.classList.add("hide");
+        yy.classList.remove("hide");
+      }else{
+        yy.classList.add("hide");
+        p.classList.remove("hide");
+      }
+    });
+  }
+  // forza stato corretto
+  if(modeEl) modeEl.dispatchEvent(new Event("change"));
+
+  await runStats();
+}
+
+async function runStats(){
+  const mode = document.getElementById("statsMode")?.value || "month";
+  let start, end;
+
+  if(mode==="year"){
+    const y = Number(document.getElementById("statsYear")?.value || new Date().getFullYear());
+    start = new Date(y,0,1);
+    end   = new Date(y+1,0,1);
+  }else{
+    const v = document.getElementById("statsPeriod")?.value || "";
+    const [yy,mm] = v.split("-").map(Number);
+    const y = yy || new Date().getFullYear();
+    const m = (mm ? mm-1 : new Date().getMonth());
+    start = new Date(y,m,1);
+    end   = new Date(y,m+1,1);
+  }
+
+  const startISO = start.toISOString();
+  const endISO = end.toISOString();
+
+  let checks = [];
+  try{
+    checks = await fetchChecksInRange(startISO, endISO);
+  }catch(err){
+    console.error(err);
+    alert("Errore nel calcolo statistiche: " + (err?.message||err));
+    return;
+  }
+
+  const total = checks.length;
+  const ok = checks.filter(c=> (c.outcome||"")==="OK").length;
+  const out = total - ok;
+  const corrected = checks.filter(c=> !!c.corretto).length;
+
+  const uniqueCodes = new Set(checks.map(c=>c.code).filter(Boolean)).size;
+
+  // giorni nel range (solo periodo)
+  const days = Math.max(1, Math.round((end - start) / (1000*60*60*24)));
+  const perDay = total / days;
+
+  const st = (id,val)=>{ const el=document.getElementById(id); if(el) el.textContent = String(val); };
+  st("stTotal", total);
+  st("stOk", ok);
+  st("stOut", out);
+  st("stCorrected", corrected);
+  st("stUniqueCodes", uniqueCodes);
+  st("stPerDay", perDay.toFixed(2));
+
+  // top codici
+  const byCode = new Map();
   for(const c of checks){
-    const code = c.code;
-    if(!code) continue;
-    if(!map.has(code)) map.set(code, []);
-    map.get(code).push(c);
+    const code = c.code || "—";
+    byCode.set(code, (byCode.get(code)||0)+1);
   }
-  for(const [k, list] of map.entries()){
-    list.sort((a,b)=> (b.dateISO||"").localeCompare(a.dateISO||""));
+  const top = [...byCode.entries()].sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).slice(0,10);
+  const topBox = document.getElementById("stTopCodes");
+  if(topBox){
+    if(!top.length){
+      topBox.innerHTML = `<div class="muted">Nessun dato nel periodo selezionato.</div>`;
+    }else{
+      topBox.innerHTML = top.map(([code,count])=>`
+        <div class="controlCard" style="margin-top:10px">
+          <div class="topline" style="margin-top:0">
+            <div>
+              <div class="muted">Codice</div>
+              <div class="title mono">${esc(code)}</div>
+            </div>
+            <span class="tag">${count} controlli</span>
+          </div>
+        </div>
+      `).join("");
+    }
   }
+
+  // per giorno
+  const byDay = new Map(); // yyyy-mm-dd => {n, ok, out}
+  for(const c of checks){
+    const d = String(c.dateISO||"").slice(0,10);
+    if(!d) continue;
+    if(!byDay.has(d)) byDay.set(d,{n:0, ok:0, out:0});
+    const o = byDay.get(d);
+    o.n += 1;
+    if((c.outcome||"")==="OK") o.ok += 1; else o.out += 1;
+  }
+  const tbody = document.getElementById("stByDay");
+  if(tbody){
+    tbody.innerHTML = "";
+    const daysList = [...byDay.entries()].sort((a,b)=> a[0].localeCompare(b[0]));
+    if(!daysList.length){
+      tbody.innerHTML = `<tr><td colspan="4" class="muted">Nessun controllo nel periodo selezionato.</td></tr>`;
+    }else{
+      for(const [d,v] of daysList){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td class="mono">${esc(d)}</td><td class="right">${v.n}</td><td class="right">${v.ok}</td><td class="right">${v.out}</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+  }
+}
+
+async function buildAllProductsRows(){
+  const t = tx([STORES.products]);
+  const products = await getAll(t.objectStore(STORES.products));
 
   products.sort((a,b)=> (a.code||"").localeCompare(b.code||""));
 
   return products.map(p=>{
-    const list = map.get(p.code) || [];
-    const last = list[0] || null;
+    const st = p.stats || {};
     return {
       code: p.code,
       name: p.name,
-      nChecks: list.length,
-      lastDate: last ? last.dateISO : null,
-      lastLot: last ? (last.lotto ?? "") : "",
-      lastBy: last ? (last.meta?.effettuatoDa ?? "") : ""
+      nChecks: (st.nChecks!=null ? st.nChecks : 0),
+      lastDate: st.lastDateISO || null,
+      lastLot: st.lastLot || "",
+      lastBy: st.lastByQc || ""
     };
   });
 }
 
 
-window.addEventListener("load", ()=>{ syncOperatorsFromCloud(); });
+window.addEventListener
+("load", ()=>{ syncOperatorsFromCloud(); });
 window.addEventListener("resize", ()=> {
   clearTimeout(window.__apResizeT);
   window.__apResizeT = setTimeout(applyAllProductsUI, 120);
