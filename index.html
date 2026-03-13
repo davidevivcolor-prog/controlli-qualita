@@ -418,6 +418,20 @@
         </div>
 
         <div id="homeRecentProducts" style="margin-top:12px"></div>
+
+        <div class="hr"></div>
+
+        <div class="topline">
+          <div>
+            <div class="muted">Riprendi</div>
+            <div class="title">Bozze in sospeso</div>
+          </div>
+          <span class="tag">Evidente</span>
+        </div>
+
+        <div class="muted">Controlli salvati in bozza, pronti da completare.</div>
+
+        <div id="homeDraftChecks" style="margin-top:12px"></div>
       </div>
 
       <!-- ALL PRODUCTS -->
@@ -638,7 +652,7 @@
   </div>
   <div class="tableWrap" style="margin-top:10px">
     <table>
-      <thead><tr><th>Data</th><th class="right">N° controlli</th><th class="right">OK</th><th class="right">Fuori STD</th></tr></thead>
+      <thead><tr><th>Data</th><th class="right">N° controlli</th><th class="right">OK</th><th class="right">Fuori STD</th><th class="right">Corretti</th></tr></thead>
       <tbody id="stByDay"></tbody>
     </table>
   </div>
@@ -791,7 +805,11 @@
           </div>
         </div>
 
+        <div class="muted" style="margin-top:10px">Bozza: salva tutti i dati inseriti e riprendi dalla Home. Nota: eventuali PDF allegati vanno reinseriti quando fai il salvataggio definitivo.</div>
+
         <div class="btns">
+          <button id="saveDraftBtn" class="secondary">Salva bozza</button>
+          <button id="deleteDraftBtn" class="secondary hide">Elimina bozza</button>
           <button class="primary" id="saveCheckBtn">Salva controllo</button>
         </div>
       </div>
@@ -997,6 +1015,7 @@
           <div class="box"><b id="opKpiChecks">0</b><span class="muted">Controlli</span></div>
           <div class="box"><b id="opKpiOk">0</b><span class="muted">OK</span></div>
           <div class="box"><b id="opKpiOut">0</b><span class="muted">Fuori STD</span></div>
+          <div class="box"><b id="opKpiCorrected">0</b><span class="muted">Corretti</span></div>
         </div>
 
         <div class="hr"></div>
@@ -1206,6 +1225,7 @@ const storage = getStorage(app);
 // Collections
 const COL_PRODUCTS = "products";
 const COL_CHECKS = "checks";
+const COL_DRAFTS = "draft_checks";
 const COL_OPERATORS = "operators";
 
 // Store names (legacy-compatible)
@@ -1213,6 +1233,9 @@ const STORES = { products: 'products', checks: 'checks' };
 
 // Global UI state (modules are strict: declare everything)
 let currentCode = null;
+let currentDraftId = null;
+let isCheckSaving = false;
+let suppressBeforeUnloadWarning = false;
 let cachedProduct = null;
 let workingControlsNew = null;
 let workingControlsEdit = null;
@@ -1966,6 +1989,128 @@ async function refreshKPIs(){
 }
 
 
+function getDraftDeleteBtn(){
+  return document.getElementById("deleteDraftBtn");
+}
+
+function setDraftUiState(active){
+  currentDraftId = active ? currentDraftId : null;
+  const btn = getDraftDeleteBtn();
+  if(btn) btn.classList.toggle("hide", !active);
+}
+
+function getCheckFormState(){
+  const p = cachedProduct;
+  if(!p) return null;
+  const data = {
+    code: p.code,
+    name: p.name || "",
+    dateISO: (()=>{
+      const raw = document.getElementById("checkDate")?.value || "";
+      if(!raw) return null;
+      const d = new Date(raw);
+      return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    })(),
+    lotto: (document.getElementById("checkLotto")?.value || "").trim().toUpperCase(),
+    meta: {
+      viscositaNote: (document.querySelector('input[data-viscnote="1"]')?.value ?? "").trim(),
+      aggiunte: (document.getElementById("checkAggiunte")?.value || "").trim(),
+      note: (document.getElementById("checkNote")?.value || "").trim(),
+      prodottoDa: (document.getElementById("checkProdottoDa")?.value || "").trim(),
+      effettuatoDa: (document.getElementById("checkEffettuatoDa")?.value || "").trim()
+    },
+    results: []
+  };
+
+  const orderKeys = buildControlsDisplayOrder(p);
+  for(const key of orderKeys){
+    const c = getControlByKey(p.controls || [], key);
+    if(!c || !hasSpecToRequest(c)) continue;
+    const inp = document.querySelector(`#checkRows input[data-val="${CSS.escape(c.key)}"]`);
+    const raw = (inp?.value ?? "").trim();
+    const v = toNumber(raw);
+    const ok = evaluateValueAgainstSpec(c, v);
+    data.results.push({
+      key: c.key,
+      name: c.name,
+      value: (v===null ? null : Number(v)),
+      unit: c.unit ?? "",
+      ok: !!ok,
+      specText: specText(c)
+    });
+  }
+
+  data.corretto = !!data.meta.aggiunte;
+  data.outcome = data.results.some(r=> !r.ok) ? "FUORI_STD" : "OK";
+  return data;
+}
+
+function hasCheckFormChanges(){
+  if(!views.newCheck || views.newCheck.classList.contains("hide")) return false;
+  const state = getCheckFormState();
+  if(!state) return false;
+  return !!(
+    state.lotto ||
+    state.meta.viscositaNote ||
+    state.meta.aggiunte ||
+    state.meta.note ||
+    state.meta.prodottoDa ||
+    state.meta.effettuatoDa ||
+    state.results.some(r=> r.value!==null) ||
+    document.querySelector('#checkRows input[type="file"]')?.files?.length
+  );
+}
+
+async function fetchDraftChecks(){
+  try{
+    const qy = query(collection(fs, COL_DRAFTS), orderBy("updatedAtISO","desc"), limit(20));
+    const snap = await getDocs(qy);
+    return snap.docs.map(d=> ({ id:d.id, ...d.data() }));
+  }catch(err){
+    console.warn("fetchDraftChecks failed:", err);
+    return [];
+  }
+}
+
+async function renderHomeDraftChecks(){
+  const box = document.getElementById("homeDraftChecks");
+  if(!box) return;
+  box.innerHTML = '<div class="muted">Caricamento…</div>';
+  const drafts = await fetchDraftChecks();
+  if(!drafts.length){
+    box.innerHTML = '<div class="muted">Nessuna bozza salvata.</div>';
+    return;
+  }
+  box.innerHTML = drafts.map(d=> `
+    <div class="controlCard" style="margin-top:10px">
+      <div class="topline" style="align-items:center">
+        <div>
+          <div style="font-weight:950">${esc(d.code || "—")} — ${esc(d.name || "")}</div>
+          <div class="muted">Ultima modifica: ${esc(fmtDateTime(d.updatedAtISO || d.createdAtISO || d.dateISO || ""))}</div>
+          <div class="muted">Lotto: <span class="mono">${esc(d.lotto || "—")}</span> • Esito stimato: ${esc((d.outcome||"BOZZA").replaceAll("_"," "))}${d.corretto ? ' • <span class="tag" title="Formula corretta tramite aggiunte">Corretto</span>' : ''}</div>
+        </div>
+        <div class="btns" style="margin-top:0">
+          <button class="smallbtn secondary" data-draft-open="${esc(d.id)}">Riprendi</button>
+          <button class="smallbtn" data-draft-delete="${esc(d.id)}">Elimina</button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+
+  box.querySelectorAll("button[data-draft-open]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      await openDraftCheck(btn.getAttribute("data-draft-open"));
+    });
+  });
+  box.querySelectorAll("button[data-draft-delete]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.getAttribute("data-draft-delete");
+      if(!confirm("Eliminare questa bozza?")) return;
+      await deleteDraftCheck(id);
+    });
+  });
+}
+
 async function renderHomeRecentProducts(){
   const box = document.getElementById("homeRecentProducts");
   box.innerHTML = "";
@@ -2585,23 +2730,24 @@ async function saveSetup(){
 /* =========================
    New check + duplicate lotto check
 ========================= */
-async function startNewCheck(){
+async function startNewCheck(draft=null){
   const p = cachedProduct;
   if(!p) return;
 
   document.getElementById("checkProdTitle").textContent = `${p.code} — ${p.name}`;
-  document.getElementById("checkDate").value = nowLocalDatetimeValue();
-  document.getElementById("checkLotto").value = "";
+  document.getElementById("checkDate").value = draft?.dateISO ? toLocalDatetimeInput(draft.dateISO) : nowLocalDatetimeValue();
+  document.getElementById("checkLotto").value = draft?.lotto || "";
 
   document.getElementById("checkNOTEfixed").textContent = p.noteOperative ?? "";
-  document.getElementById("checkAggiunte").value = "";
-  document.getElementById("checkNote").value = "";
-  document.getElementById("checkProdottoDa").value = "";
-  document.getElementById("checkEffettuatoDa").value = "";
+  document.getElementById("checkAggiunte").value = draft?.meta?.aggiunte || "";
+  document.getElementById("checkNote").value = draft?.meta?.note || "";
+  document.getElementById("checkProdottoDa").value = draft?.meta?.prodottoDa || "";
+  document.getElementById("checkEffettuatoDa").value = draft?.meta?.effettuatoDa || "";
 
   const container = document.getElementById("checkRows");
   container.innerHTML = "";
 
+  const draftResults = new Map((draft?.results || []).map(r=> [r.key, r]));
   const orderKeys = buildControlsDisplayOrder(p);
   let anyShown = false;
 
@@ -2625,7 +2771,7 @@ async function startNewCheck(){
         <div class="row2" style="margin-top:10px">
           <div>
             <label>Note viscosità (es. 20/30°C, R4...)</label>
-            <input data-viscnote="1" placeholder="Scrivi note viscosità..." />
+            <input data-viscnote="1" placeholder="Scrivi note viscosità..." value="${esc(draft?.meta?.viscositaNote || "")}" />
           </div>
         </div>
       ` : "";
@@ -2641,6 +2787,10 @@ async function startNewCheck(){
         </div>
       ` : "";
 
+    const draftResult = draftResults.get(c.key) || null;
+    const draftVal = draftResult?.value;
+    const outValue = (draftVal===null || draftVal===undefined) ? "—" : (draftResult?.ok ? "OK" : "Fuori STD");
+
     card.innerHTML = `
       <div class="controlTitle">
         <div><b>${esc(c.name)}</b> <span class="tag">${esc(c.unit || "-")}</span></div>
@@ -2650,11 +2800,11 @@ async function startNewCheck(){
       <div class="row2" style="margin-top:10px">
         <div>
           <label>Valore</label>
-          <input data-val="${esc(c.key)}" type="number" step="any" placeholder="Inserisci valore..." />
+          <input data-val="${esc(c.key)}" type="number" step="any" placeholder="Inserisci valore..." value="${draftVal===null || draftVal===undefined ? "" : esc(String(draftVal))}" />
         </div>
         <div>
           <label>Esito</label>
-          <input data-out="${esc(c.key)}" value="—" disabled />
+          <input data-out="${esc(c.key)}" value="${esc(outValue)}" disabled />
         </div>
       </div>
       ${attachmentField}
@@ -2680,8 +2830,132 @@ async function startNewCheck(){
     container.appendChild(warn);
   }
 
+  currentDraftId = draft?.id || null;
+  setDraftUiState(!!currentDraftId);
   renderOperatorPickers();
   showView("newCheck");
+}
+
+function toLocalDatetimeInput(iso){
+  const d = new Date(iso);
+  if(Number.isNaN(d.getTime())) return nowLocalDatetimeValue();
+  const local = new Date(d.getTime() - d.getTimezoneOffset()*60000);
+  return local.toISOString().slice(0,16);
+}
+
+async function saveCheckDraft(options={}){
+  const p = cachedProduct;
+  if(!p) return false;
+  if(isCheckSaving) return false;
+  const state = getCheckFormState();
+  if(!state) return false;
+  const hasAnyData = hasCheckFormChanges();
+  if(!hasAnyData){
+    if(!options.silent) alert("Compila almeno un campo prima di salvare una bozza.");
+    return false;
+  }
+
+  const fileSelected = !!document.querySelector('#checkRows input[type="file"]')?.files?.length;
+  if(fileSelected && !options.silent){
+    alert("Nota: i PDF allegati non vengono salvati in bozza. Quando completi il controllo dovrai reinserirli.");
+  }
+
+  isCheckSaving = true;
+  const saveBtn = document.getElementById("saveDraftBtn");
+  const prevText = saveBtn?.textContent || "Salva bozza";
+  if(saveBtn){ saveBtn.disabled = true; saveBtn.textContent = "Salvataggio…"; }
+  try{
+    let draftId = currentDraftId || null;
+    if(!draftId){
+      try{
+        const existingSnap = await getDocs(query(collection(fs, COL_DRAFTS), where("code","==", state.code), limit(1)));
+        const existing = existingSnap.docs[0];
+        if(existing) draftId = existing.id;
+      }catch(err){
+        console.warn("Lookup bozza esistente fallito:", err);
+      }
+    }
+    if(!draftId) draftId = uuid();
+    const payload = {
+      id: draftId,
+      status: "draft",
+      code: state.code,
+      name: state.name,
+      dateISO: state.dateISO || new Date().toISOString(),
+      lotto: state.lotto || "",
+      outcome: state.outcome,
+      corretto: state.corretto,
+      results: state.results,
+      meta: state.meta,
+      createdAtISO: options.keepCreatedAtISO || new Date().toISOString(),
+      updatedAtISO: new Date().toISOString()
+    };
+    if(currentDraftId){
+      try{
+        const snap = await getDoc(doc(fs, COL_DRAFTS, currentDraftId));
+        if(snap.exists() && snap.data()?.createdAtISO){ payload.createdAtISO = snap.data().createdAtISO; }
+      }catch(_){ }
+    }
+    await setDoc(doc(fs, COL_DRAFTS, draftId), payload, { merge:true });
+    currentDraftId = draftId;
+    setDraftUiState(true);
+    await renderHomeDraftChecks();
+    if(!options.silent) alert("Bozza salvata.");
+    if(options.exitAfterSave){
+      await loadProduct(p.code);
+    }
+    return true;
+  }catch(err){
+    console.error(err);
+    if(!options.silent) alert("Errore salvataggio bozza: " + (err?.message || err));
+    return false;
+  }finally{
+    isCheckSaving = false;
+    if(saveBtn){ saveBtn.disabled = false; saveBtn.textContent = prevText; }
+  }
+}
+
+async function deleteDraftCheck(draftId=currentDraftId, options={}){
+  if(!draftId) return false;
+  try{
+    await deleteDoc(doc(fs, COL_DRAFTS, draftId));
+    if(currentDraftId===draftId){
+      currentDraftId = null;
+      setDraftUiState(false);
+    }
+    await renderHomeDraftChecks();
+    if(!options.silent) alert("Bozza eliminata.");
+    return true;
+  }catch(err){
+    console.error(err);
+    if(!options.silent) alert("Errore eliminazione bozza: " + (err?.message || err));
+    return false;
+  }
+}
+
+async function openDraftCheck(draftId){
+  if(!draftId) return;
+  try{
+    const snap = await getDoc(doc(fs, COL_DRAFTS, draftId));
+    if(!snap.exists()) return alert("Bozza non trovata.");
+    const draft = { id:snap.id, ...snap.data() };
+    await loadProduct(draft.code);
+    await startNewCheck(draft);
+  }catch(err){
+    console.error(err);
+    alert("Errore apertura bozza: " + (err?.message || err));
+  }
+}
+
+async function confirmAbandonNewCheck(){
+  if(!hasCheckFormChanges()) return true;
+  const save = confirm("Hai dati non salvati. Premi OK per salvarli in bozza; premi Annulla per scegliere se uscire senza salvare.");
+  if(save){
+    const done = await saveCheckDraft({ exitAfterSave:true, silent:true });
+    if(done) return false;
+    return false;
+  }
+  return confirm("Vuoi davvero uscire e perdere le modifiche non salvate?");
 }
 
 async function confirmDuplicateLottoIfNeeded(lotto, ignoreCheckId=null){
@@ -2698,163 +2972,179 @@ async function confirmDuplicateLottoIfNeeded(lotto, ignoreCheckId=null){
 async function saveCheck(){
   const p = cachedProduct;
   if(!p) return;
+  if(isCheckSaving) return;
 
-  const checkId = uuid();
+  isCheckSaving = true;
+  const saveBtn = document.getElementById("saveCheckBtn");
+  const draftBtn = document.getElementById("saveDraftBtn");
+  const deleteBtn = document.getElementById("deleteDraftBtn");
+  const prevSaveText = saveBtn?.textContent || "Salva controllo";
+  if(saveBtn){ saveBtn.disabled = true; saveBtn.textContent = "Salvataggio…"; }
+  if(draftBtn) draftBtn.disabled = true;
+  if(deleteBtn) deleteBtn.disabled = true;
 
-  const dateLocal = document.getElementById("checkDate").value;
-  const dateISO = new Date(dateLocal).toISOString();
+  try{
+    const checkId = uuid();
 
-  const lotto = document.getElementById("checkLotto").value.trim().toUpperCase();
-  if(!lotto) return alert("Il lotto è obbligatorio.");
+    const dateLocal = document.getElementById("checkDate").value;
+    const dateISO = new Date(dateLocal).toISOString();
 
-  const okDup = await confirmDuplicateLottoIfNeeded(lotto);
-  if(!okDup) return;
+    const lotto = document.getElementById("checkLotto").value.trim().toUpperCase();
+    if(!lotto){ alert("Il lotto è obbligatorio."); return; }
 
-  const meta = {
-    viscositaNote: (document.querySelector('input[data-viscnote="1"]')?.value ?? "").trim(),
-    aggiunte: document.getElementById("checkAggiunte").value.trim(),
-    note: document.getElementById("checkNote").value.trim(),
-    prodottoDa: document.getElementById("checkProdottoDa").value.trim(),
-    effettuatoDa: document.getElementById("checkEffettuatoDa").value.trim()
-  };
+    const okDup = await confirmDuplicateLottoIfNeeded(lotto);
+    if(!okDup) return;
 
-  const results = [];
-  let anyOut = false;
-  const missingControls = [];
+    const meta = {
+      viscositaNote: (document.querySelector('input[data-viscnote="1"]')?.value ?? "").trim(),
+      aggiunte: document.getElementById("checkAggiunte").value.trim(),
+      note: document.getElementById("checkNote").value.trim(),
+      prodottoDa: document.getElementById("checkProdottoDa").value.trim(),
+      effettuatoDa: document.getElementById("checkEffettuatoDa").value.trim()
+    };
 
-  const orderKeys = buildControlsDisplayOrder(p);
-  for(const key of orderKeys){
-    const c = getControlByKey(p.controls || [], key);
-    if(!c) continue;
-    if(!hasSpecToRequest(c)) continue;
+    const results = [];
+    let anyOut = false;
+    const missingControls = [];
 
-    const inp = document.querySelector(`#checkRows input[data-val="${CSS.escape(c.key)}"]`);
-    const raw = (inp?.value ?? "").trim();
-    const v = toNumber(raw);
-    if(v===null){
-      missingControls.push(c.name);
-    }
+    const orderKeys = buildControlsDisplayOrder(p);
+    for(const key of orderKeys){
+      const c = getControlByKey(p.controls || [], key);
+      if(!c) continue;
+      if(!hasSpecToRequest(c)) continue;
 
-    const ok = evaluateValueAgainstSpec(c, v);
-    if(!ok) anyOut = true;
+      const inp = document.querySelector(`#checkRows input[data-val="${CSS.escape(c.key)}"]`);
+      const raw = (inp?.value ?? "").trim();
+      const v = toNumber(raw);
+      if(v===null){
+        missingControls.push(c.name);
+      }
 
-    // Allegati PDF (solo ΔE / Resa) — su Storage (evita limite 1MB Firestore)
-    let attachmentName = null;
-    let attachmentUrl = null;
-    let attachmentPath = null;
-    let attachmentBytes = null;
-    if(c.key==="deltae" || c.key==="resa"){
-      const fInp = document.querySelector(`#checkRows input[type="file"][data-file="${CSS.escape(c.key)}"]`);
-      const file = fInp?.files?.[0] || null;
-      if(file){
-        try{
-          const up = await uploadAttachmentToStorage({ checkId, key: c.key, file });
-          attachmentName = up?.attachmentName ?? (file.name || "allegato.pdf");
-          attachmentUrl = up?.attachmentUrl ?? null;
-          attachmentPath = up?.attachmentPath ?? null;
-          attachmentBytes = up?.attachmentBytes ?? null;
-        }catch(err){
-          console.error(err);
-          alert("Errore caricamento PDF allegato (prova a rinominare/ricomprimere il file): " + (err?.message || err));
+      const ok = evaluateValueAgainstSpec(c, v);
+      if(!ok) anyOut = true;
+
+      let attachmentName = null;
+      let attachmentUrl = null;
+      let attachmentPath = null;
+      let attachmentBytes = null;
+      if(c.key==="deltae" || c.key==="resa"){
+        const fInp = document.querySelector(`#checkRows input[type="file"][data-file="${CSS.escape(c.key)}"]`);
+        const file = fInp?.files?.[0] || null;
+        if(file){
+          try{
+            const up = await uploadAttachmentToStorage({ checkId, key: c.key, file });
+            attachmentName = up?.attachmentName ?? (file.name || "allegato.pdf");
+            attachmentUrl = up?.attachmentUrl ?? null;
+            attachmentPath = up?.attachmentPath ?? null;
+            attachmentBytes = up?.attachmentBytes ?? null;
+          }catch(err){
+            console.error(err);
+            alert("Errore caricamento PDF allegato (prova a rinominare/ricomprimere il file): " + (err?.message || err));
+          }
         }
       }
+
+      results.push({ key:c.key, name:c.name, value:v, unit:c.unit ?? "", ok, specText: specText(c), attachmentName, attachmentUrl, attachmentPath, attachmentBytes });
     }
 
-    results.push({ key:c.key, name:c.name, value:v, unit:c.unit ?? "", ok, specText: specText(c), attachmentName, attachmentUrl, attachmentPath, attachmentBytes });
-  }
-  // Conferme: dati mancanti (tranne lotto) + operatori non presenti in elenco
-  const missingMeta = [];
-  if(!meta.prodottoDa) missingMeta.push("Prodotto da");
-  if(!meta.effettuatoDa) missingMeta.push("Effettuato da");
+    const missingMeta = [];
+    if(!meta.prodottoDa) missingMeta.push("Prodotto da");
+    if(!meta.effettuatoDa) missingMeta.push("Effettuato da");
 
-  const ops = loadOperators();
-  const prodOps = ops.filter(o=> (o.role||"").toLowerCase()==="produzione").map(formatOperator);
-  const qcOps   = ops.filter(o=> (o.role||"").toLowerCase()==="qualita").map(formatOperator);
+    const ops = loadOperators();
+    const prodOps = ops.filter(o=> (o.role||"").toLowerCase()==="produzione").map(formatOperator);
+    const qcOps   = ops.filter(o=> (o.role||"").toLowerCase()==="qualita").map(formatOperator);
 
-  const notInList = [];
-  if(meta.prodottoDa && !isOperatorInList(meta.prodottoDa, prodOps)) notInList.push(`Prodotto da: "${meta.prodottoDa}"`);
-  if(meta.effettuatoDa && !isOperatorInList(meta.effettuatoDa, qcOps)) notInList.push(`Effettuato da: "${meta.effettuatoDa}"`);
+    const notInList = [];
+    if(meta.prodottoDa && !isOperatorInList(meta.prodottoDa, prodOps)) notInList.push(`Prodotto da: "${meta.prodottoDa}"`);
+    if(meta.effettuatoDa && !isOperatorInList(meta.effettuatoDa, qcOps)) notInList.push(`Effettuato da: "${meta.effettuatoDa}"`);
 
-  const warnParts = [];
-  if(missingControls.length) warnParts.push("Valori mancanti (saranno FUORI STD):\n- " + missingControls.join("\n- "));
-  if(missingMeta.length) warnParts.push("Campi non compilati:\n- " + missingMeta.join("\n- "));
-  if(notInList.length) warnParts.push("Operatori non presenti in elenco (salvo comunque):\n- " + notInList.join("\n- "));
+    const warnParts = [];
+    if(missingControls.length) warnParts.push(`Valori mancanti (saranno FUORI STD):\n- ${missingControls.join("\n- ")}`);
+    if(missingMeta.length) warnParts.push(`Campi non compilati:\n- ${missingMeta.join("\n- ")}`);
+    if(notInList.length) warnParts.push(`Operatori non presenti in elenco (salvo comunque):\n- ${notInList.join("\n- ")}`);
 
-  if(warnParts.length){
-    const ok = confirm(warnParts.join("\n\n") + "\n\nVuoi salvare comunque?");
-    if(!ok) return;
-  }
+    if(warnParts.length){
+      const ok = confirm(warnParts.join("\n\n") + "\n\nVuoi salvare comunque?");
+      if(!ok) return;
+    }
 
+    const corretto = !!(meta.aggiunte && meta.aggiunte.trim().length>0);
 
-  const corretto = !!(meta.aggiunte && meta.aggiunte.trim().length>0);
+    const resultsSan = (results||[]).map(r=>({
+      key: String(r.key||""),
+      name: String(r.name||""),
+      value: (r.value===null ? null : Number(r.value)),
+      unit: String(r.unit||""),
+      ok: !!r.ok,
+      specText: String(r.specText||""),
+      attachmentName: (r.attachmentName ? String(r.attachmentName) : null),
+      attachmentUrl: (r.attachmentUrl ? String(r.attachmentUrl) : null),
+      attachmentPath: (r.attachmentPath ? String(r.attachmentPath) : null),
+      attachmentBytes: (r.attachmentBytes==null ? null : Number(r.attachmentBytes)),
+      attachmentB64: (r.attachmentB64 ? String(r.attachmentB64) : null)
+    }));
 
-// Sanitize per Firestore (evita undefined / entità non supportate)
-const resultsSan = (results||[]).map(r=>({
-  key: String(r.key||""),
-  name: String(r.name||""),
-  value: (r.value===null ? null : Number(r.value)),
-  unit: String(r.unit||""),
-  ok: !!r.ok,
-  specText: String(r.specText||""),
-  attachmentName: (r.attachmentName ? String(r.attachmentName) : null),
-  attachmentUrl: (r.attachmentUrl ? String(r.attachmentUrl) : null),
-  attachmentPath: (r.attachmentPath ? String(r.attachmentPath) : null),
-  attachmentBytes: (r.attachmentBytes==null ? null : Number(r.attachmentBytes)),
-  attachmentB64: (r.attachmentB64 ? String(r.attachmentB64) : null)
-}));
+    const check = {
+      id: checkId,
+      code: p.code,
+      dateISO,
+      lotto,
+      outcome: anyOut ? "FUORI_STD" : "OK",
+      corretto,
+      results: resultsSan,
+      meta,
+      modifications: {}
+    };
 
-const check = {
-  id: checkId,
-  code: p.code,
-  dateISO,
-  lotto,
-  outcome: anyOut ? "FUORI_STD" : "OK",
-  corretto,
-  results: resultsSan,
-  meta,
-  modifications: {}
-};
+    const t = tx([STORES.checks], "readwrite");
+    await put(t.objectStore(STORES.checks), check);
 
-  const t = tx([STORES.checks], "readwrite");
-  await put(t.objectStore(STORES.checks), check);
-
-
-// Aggiorna statistiche prodotto (per rendere Home / Tutti i prodotti più veloci)
-try{
-  const pRef = doc(fs, COL_PRODUCTS, p.code);
-  await updateDoc(pRef, {
-    "stats.nChecks": increment(1),
-    "stats.nOk": increment(check.outcome==="OK" ? 1 : 0),
-    "stats.nOut": increment(check.outcome==="OK" ? 0 : 1),
-    "stats.nCorrected": increment(check.corretto ? 1 : 0),
-    "stats.lastDateISO": check.dateISO,
-    "stats.lastLot": check.lotto || "",
-    "stats.lastByQc": check.meta?.effettuatoDa || "",
-    "stats.lastByProd": check.meta?.prodottoDa || "",
-  });
-}catch(err){
-  // se il doc non esiste ancora o manca stats, fallback a setDoc merge
-  try{
-    await setDoc(doc(fs, COL_PRODUCTS, p.code), {
-      stats:{
-        nChecks: 1,
-        nOk: (check.outcome==="OK" ? 1 : 0),
-        nOut: (check.outcome==="OK" ? 0 : 1),
-        nCorrected: (check.corretto ? 1 : 0),
-        lastDateISO: check.dateISO,
-        lastLot: check.lotto || "",
-        lastByQc: check.meta?.effettuatoDa || "",
-        lastByProd: check.meta?.prodottoDa || ""
+    try{
+      const pRef = doc(fs, COL_PRODUCTS, p.code);
+      await updateDoc(pRef, {
+        "stats.nChecks": increment(1),
+        "stats.nOk": increment(check.outcome==="OK" ? 1 : 0),
+        "stats.nOut": increment(check.outcome==="OK" ? 0 : 1),
+        "stats.nCorrected": increment(check.corretto ? 1 : 0),
+        "stats.lastDateISO": check.dateISO,
+        "stats.lastLot": check.lotto || "",
+        "stats.lastByQc": check.meta?.effettuatoDa || "",
+        "stats.lastByProd": check.meta?.prodottoDa || "",
+      });
+    }catch(err){
+      try{
+        await setDoc(doc(fs, COL_PRODUCTS, p.code), {
+          stats:{
+            nChecks: 1,
+            nOk: (check.outcome==="OK" ? 1 : 0),
+            nOut: (check.outcome==="OK" ? 0 : 1),
+            nCorrected: (check.corretto ? 1 : 0),
+            lastDateISO: check.dateISO,
+            lastLot: check.lotto || "",
+            lastByQc: check.meta?.effettuatoDa || "",
+            lastByProd: check.meta?.prodottoDa || ""
+          }
+        }, { merge:true });
+      }catch(err2){
+        console.warn("Impossibile aggiornare stats prodotto:", err2);
       }
-    }, { merge:true });
-  }catch(err2){
-    console.warn("Impossibile aggiornare stats prodotto:", err2);
-  }
-}
+    }
 
-  await refreshKPIs();
-  await renderHomeRecentProducts();
-  await loadProduct(p.code);
+    if(currentDraftId){
+      await deleteDraftCheck(currentDraftId, { silent:true });
+    }
+
+    await refreshKPIs();
+    await renderHomeRecentProducts();
+    await renderHomeDraftChecks();
+    await loadProduct(p.code);
+  }finally{
+    isCheckSaving = false;
+    if(saveBtn){ saveBtn.disabled = false; saveBtn.textContent = prevSaveText; }
+    if(draftBtn) draftBtn.disabled = false;
+    if(deleteBtn) deleteBtn.disabled = false;
+  }
 }
 
 /* =========================
@@ -3537,7 +3827,7 @@ on("setupSaveBtn","click",saveSetup);
 on("addCustomControlBtnNew","click",()=> addCustomControl("new"));
 on("addCustomControlBtnEdit","click",()=> addCustomControl("edit"));
 
-on("newCheckBtn","click",startNewCheck);
+on("newCheckBtn","click",()=> startNewCheck());
 on("operatorsBtn","click",async ()=>{ await syncOperatorsFromCloud(); renderOperatorsList(); resetOperatorForm(); showView("operators"); });
 on("operatorsBackBtn","click",()=> showView("home"));
 on("backToOperatorsBtn","click",()=>{ renderOperatorsList(); showView("operators"); });
@@ -3583,6 +3873,14 @@ on("saveOperatorBtn","click",async ()=>{
 });
 
 on("cancelCheckBtn","click",async ()=> loadProduct(currentCode));
+on("saveDraftBtn","click",()=> saveCheckDraft());
+on("deleteDraftBtn","click", async ()=>{
+  if(!currentDraftId) return;
+  if(!confirm("Eliminare questa bozza?")) return;
+  const code = cachedProduct?.code || null;
+  const ok = await deleteDraftCheck(currentDraftId, { silent:true });
+  if(ok && code) await loadProduct(code);
+});
 on("saveCheckBtn","click",saveCheck);
 
 // Lotto sempre MAIUSCOLO (input live)
@@ -3678,6 +3976,7 @@ on("restoreJsonFile","change",async (e)=>{
     showView("home");
     await refreshKPIs();
     await renderHomeRecentProducts();
+    await renderHomeDraftChecks();
   }catch(err){
     alert("Errore ripristino: " + err.message);
   }finally{
@@ -3705,6 +4004,7 @@ on("wipeBtn","click",async ()=>{
   cachedProduct = null;
   showView("home");
   await refreshKPIs();
+  await renderHomeDraftChecks();
   await renderAllProducts();
   alert("Database cloud svuotato.");
 });
@@ -3947,6 +4247,7 @@ async function renderOperatorHistory(op){
   const kChecks = document.getElementById("opKpiChecks");
   const kOk = document.getElementById("opKpiOk");
   const kOut = document.getElementById("opKpiOut");
+  const kCorrected = document.getElementById("opKpiCorrected");
 
   if(title) title.textContent = formatOperator(op);
   if(meta) meta.textContent = `Ruolo: ${(op.role||"").toUpperCase()}`;
@@ -3956,6 +4257,7 @@ async function renderOperatorHistory(op){
   if(kChecks) kChecks.textContent = "0";
   if(kOk) kOk.textContent = "0";
   if(kOut) kOut.textContent = "0";
+  if(kCorrected) kCorrected.textContent = "0";
 
   // Match: usiamo la stringa che viene salvata nei controlli (es. "DM - Rossi Mario")
   const key = formatOperator(op);
@@ -3988,32 +4290,40 @@ async function renderOperatorHistory(op){
   const total = checks.length;
   const ok = checks.filter(c => (c.outcome||"") === "OK").length;
   const out = checks.filter(c => (c.outcome||"") && (c.outcome||"") !== "OK").length;
+  const corrected = checks.filter(c => !!c.corretto).length;
 
   if(kChecks) kChecks.textContent = String(total);
   if(kOk) kOk.textContent = String(ok);
   if(kOut) kOut.textContent = String(out);
+  if(kCorrected) kCorrected.textContent = String(corrected);
 
   // Breakdown per prodotto (Top 3)
   const byProd = new Map();
   for(const c of checks){
     const code = c.code || "—";
-    byProd.set(code, (byProd.get(code)||0)+1);
+    const prev = byProd.get(code) || { total:0, corrected:0 };
+    prev.total += 1;
+    if(c.corretto) prev.corrected += 1;
+    byProd.set(code, prev);
   }
-  const prodRows = [...byProd.entries()].sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]));
+  const prodRows = [...byProd.entries()].sort((a,b)=> b[1].total-a[1].total || a[0].localeCompare(b[0]));
   const top3 = prodRows.slice(0,3);
 
   if(breakdown){
     if(!prodRows.length){
       breakdown.innerHTML = '<div class="muted">Nessun controllo trovato per questo operatore.</div>';
     }else{
-      breakdown.innerHTML = top3.map(([code,count])=>`
+      breakdown.innerHTML = top3.map(([code,stats])=>`
         <div class="controlCard" style="margin-top:10px">
           <div class="topline" style="margin-top:0">
             <div>
               <div class="muted">Prodotto</div>
               <div class="title mono">${esc(code)}</div>
             </div>
-            <span class="tag">${count} controlli</span>
+            <div class="btns" style="margin-top:0">
+              <span class="tag">${stats.total} controlli</span>
+              <span class="tag">${stats.corrected} corretti</span>
+            </div>
           </div>
         </div>
       `).join("") + (prodRows.length>3 ? `<div class="muted" style="margin-top:10px">+ altri ${prodRows.length-3} prodotti</div>` : "");
@@ -4280,6 +4590,7 @@ async function deleteProductFlow(code){
 
     await refreshKPIs();
     await renderHomeRecentProducts();
+    await renderHomeDraftChecks();
     await renderAllProducts();
   }catch(err){
     console.error(err);
@@ -4433,25 +4744,26 @@ async function runStats(){
   }
 
   // per giorno
-  const byDay = new Map(); // yyyy-mm-dd => {n, ok, out}
+  const byDay = new Map(); // yyyy-mm-dd => {n, ok, out, corrected}
   for(const c of checks){
     const d = String(c.dateISO||"").slice(0,10);
     if(!d) continue;
-    if(!byDay.has(d)) byDay.set(d,{n:0, ok:0, out:0});
+    if(!byDay.has(d)) byDay.set(d,{n:0, ok:0, out:0, corrected:0});
     const o = byDay.get(d);
     o.n += 1;
     if((c.outcome||"")==="OK") o.ok += 1; else o.out += 1;
+    if(c.corretto) o.corrected += 1;
   }
   const tbody = document.getElementById("stByDay");
   if(tbody){
     tbody.innerHTML = "";
     const daysList = [...byDay.entries()].sort((a,b)=> a[0].localeCompare(b[0]));
     if(!daysList.length){
-      tbody.innerHTML = `<tr><td colspan="4" class="muted">Nessun controllo nel periodo selezionato.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="muted">Nessun controllo nel periodo selezionato.</td></tr>`;
     }else{
       for(const [d,v] of daysList){
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td class="mono">${esc(d)}</td><td class="right">${v.n}</td><td class="right">${v.ok}</td><td class="right">${v.out}</td>`;
+        tr.innerHTML = `<td class="mono">${esc(d)}</td><td class="right">${v.n}</td><td class="right">${v.ok}</td><td class="right">${v.out}</td><td class="right">${v.corrected}</td>`;
         tbody.appendChild(tr);
       }
     }
