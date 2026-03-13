@@ -2061,15 +2061,60 @@ function hasCheckFormChanges(){
   );
 }
 
+function loadDraftChecksLocal(){
+  try{
+    const list = JSON.parse(localStorage.getItem(DRAFTS_KEY) || "[]");
+    return Array.isArray(list) ? list : [];
+  }catch(_){ return []; }
+}
+
+function saveDraftChecksLocal(list){
+  localStorage.setItem(DRAFTS_KEY, JSON.stringify(Array.isArray(list) ? list : []));
+}
+
+function sortDraftChecks(list){
+  return (Array.isArray(list) ? list.slice() : []).sort((a,b)=>{
+    const ta = Date.parse(a?.updatedAtISO || a?.createdAtISO || a?.dateISO || 0) || 0;
+    const tb = Date.parse(b?.updatedAtISO || b?.createdAtISO || b?.dateISO || 0) || 0;
+    return tb - ta;
+  });
+}
+
+function upsertDraftLocal(payload){
+  const list = loadDraftChecksLocal();
+  const idx = list.findIndex(x=> x && x.id===payload.id);
+  if(idx>=0) list[idx] = { ...list[idx], ...payload };
+  else list.push(payload);
+  saveDraftChecksLocal(sortDraftChecks(list));
+}
+
+function deleteDraftLocalById(id){
+  const list = loadDraftChecksLocal().filter(x=> x && x.id!==id);
+  saveDraftChecksLocal(list);
+}
+
+function getDraftLocalById(id){
+  return loadDraftChecksLocal().find(x=> x && x.id===id) || null;
+}
+
+function findExistingDraftLocalByCode(code, excludeId=null){
+  return loadDraftChecksLocal().find(x=> x && x.code===code && x.id!==excludeId) || null;
+}
+
 async function fetchDraftChecks(){
+  const localDrafts = sortDraftChecks(loadDraftChecksLocal()).slice(0,20);
   try{
     const qy = query(collection(fs, COL_DRAFTS), orderBy("updatedAtISO","desc"), limit(20));
     const snap = await getDocs(qy);
-    return snap.docs.map(d=> ({ id:d.id, ...d.data() }));
+    const cloudDrafts = snap.docs.map(d=> ({ id:d.id, ...d.data() }));
+    if(cloudDrafts.length){
+      saveDraftChecksLocal(cloudDrafts);
+      return cloudDrafts;
+    }
   }catch(err){
-    console.warn("fetchDraftChecks failed:", err);
-    return [];
+    console.warn("fetchDraftChecks cloud fallback -> local:", err);
   }
+  return localDrafts;
 }
 
 async function renderHomeDraftChecks(){
@@ -2867,15 +2912,33 @@ async function saveCheckDraft(options={}){
   try{
     let draftId = currentDraftId || null;
     if(!draftId){
+      const localExisting = findExistingDraftLocalByCode(state.code);
+      if(localExisting) draftId = localExisting.id;
+    }
+    if(!draftId){
       try{
         const existingSnap = await getDocs(query(collection(fs, COL_DRAFTS), where("code","==", state.code), limit(1)));
         const existing = existingSnap.docs[0];
         if(existing) draftId = existing.id;
       }catch(err){
-        console.warn("Lookup bozza esistente fallito:", err);
+        console.warn("Lookup bozza cloud non disponibile, uso storage locale:", err);
       }
     }
     if(!draftId) draftId = uuid();
+
+    let createdAtISO = options.keepCreatedAtISO || null;
+    if(!createdAtISO){
+      const currentLocal = getDraftLocalById(draftId);
+      if(currentLocal?.createdAtISO) createdAtISO = currentLocal.createdAtISO;
+    }
+    if(!createdAtISO && currentDraftId){
+      try{
+        const snap = await getDoc(doc(fs, COL_DRAFTS, currentDraftId));
+        if(snap.exists() && snap.data()?.createdAtISO) createdAtISO = snap.data().createdAtISO;
+      }catch(_){ }
+    }
+    if(!createdAtISO) createdAtISO = new Date().toISOString();
+
     const payload = {
       id: draftId,
       status: "draft",
@@ -2887,16 +2950,18 @@ async function saveCheckDraft(options={}){
       corretto: state.corretto,
       results: state.results,
       meta: state.meta,
-      createdAtISO: options.keepCreatedAtISO || new Date().toISOString(),
+      createdAtISO,
       updatedAtISO: new Date().toISOString()
     };
-    if(currentDraftId){
-      try{
-        const snap = await getDoc(doc(fs, COL_DRAFTS, currentDraftId));
-        if(snap.exists() && snap.data()?.createdAtISO){ payload.createdAtISO = snap.data().createdAtISO; }
-      }catch(_){ }
+
+    upsertDraftLocal(payload);
+
+    try{
+      await setDoc(doc(fs, COL_DRAFTS, draftId), payload, { merge:true });
+    }catch(err){
+      console.warn("Bozza salvata solo in locale:", err);
     }
-    await setDoc(doc(fs, COL_DRAFTS, draftId), payload, { merge:true });
+
     currentDraftId = draftId;
     setDraftUiState(true);
     await renderHomeDraftChecks();
@@ -2918,7 +2983,8 @@ async function saveCheckDraft(options={}){
 async function deleteDraftCheck(draftId=currentDraftId, options={}){
   if(!draftId) return false;
   try{
-    await deleteDoc(doc(fs, COL_DRAFTS, draftId));
+    deleteDraftLocalById(draftId);
+    try{ await deleteDoc(doc(fs, COL_DRAFTS, draftId)); }catch(err){ console.warn("Delete cloud bozza non disponibile:", err); }
     if(currentDraftId===draftId){
       currentDraftId = null;
       setDraftUiState(false);
@@ -2936,9 +3002,16 @@ async function deleteDraftCheck(draftId=currentDraftId, options={}){
 async function openDraftCheck(draftId){
   if(!draftId) return;
   try{
-    const snap = await getDoc(doc(fs, COL_DRAFTS, draftId));
-    if(!snap.exists()) return alert("Bozza non trovata.");
-    const draft = { id:snap.id, ...snap.data() };
+    let draft = getDraftLocalById(draftId);
+    if(!draft){
+      try{
+        const snap = await getDoc(doc(fs, COL_DRAFTS, draftId));
+        if(snap.exists()) draft = { id:snap.id, ...snap.data() };
+      }catch(err){
+        console.warn("Apertura cloud bozza non disponibile:", err);
+      }
+    }
+    if(!draft) return alert("Bozza non trovata.");
     await loadProduct(draft.code);
     await startNewCheck(draft);
   }catch(err){
@@ -4014,6 +4087,7 @@ on("wipeBtn","click",async ()=>{
    Operators (localStorage)
 ========================= */
 const OPERATORS_KEY = "vivcolor_operators_v1";
+const DRAFTS_KEY = "vivcolor_draft_checks_v1";
 
 function genId(){
   return "op_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,8);
