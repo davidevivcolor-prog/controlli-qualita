@@ -3,48 +3,50 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Registro Controlli VivColor</title>
+  <title>Registro Controlli Qualità — VivColor</title>
   <link rel="icon" href="data:,">
   <style>
     *{ box-sizing:border-box; }
+    html{ scroll-behavior:smooth; }
     :root{
-      --b:#e7e7e7;
+      --b:#e2e8f0;
       --t:#0f172a;
       --m:#64748b;
-      --bg:#f6f7fb;
+      --bg:#f1f5f9;
       --card:#ffffff;
-      --shadow: 0 6px 18px rgba(15,23,42,.06);
-      --radius:16px;
-      --accent:#111827;
+      --shadow: 0 1px 3px rgba(15,23,42,.06), 0 4px 16px rgba(15,23,42,.04);
+      --shadow-hover: 0 2px 6px rgba(15,23,42,.08), 0 8px 24px rgba(15,23,42,.06);
+      --radius:14px;
+      --accent:#0f172a;
       --accent2:#0ea5e9;
       --danger:#b00020;
-      --okbg:#effaf2;
-      --okbd:#bfe7c8;
-      --kobg:#fff2f2;
-      --kobd:#ffcccc;
+      --okbg:#f0fdf4;
+      --okbd:#bbf7d0;
+      --kobg:#fff1f2;
+      --kobd:#fecdd3;
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
     body{
       margin:0;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-      background:
-        radial-gradient(circle at top left, rgba(14,165,233,.08), transparent 28%),
-        radial-gradient(circle at top right, rgba(17,24,39,.06), transparent 24%),
-        var(--bg);
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+      background:var(--bg);
       color:var(--t);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
     }
     header{
       position:sticky; top:0; z-index:10;
-      background:rgba(255,255,255,.9);
-      backdrop-filter:saturate(140%) blur(10px);
+      background:rgba(255,255,255,.92);
+      backdrop-filter:saturate(160%) blur(12px);
+      -webkit-backdrop-filter:saturate(160%) blur(12px);
       border-bottom:1px solid var(--b);
-      padding:14px 16px;
+      padding:12px 16px;
     }
     header .row{
       max-width:1200px; margin:0 auto;
       display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;
     }
-    header h1{ font-size:14px; margin:0; font-weight:900; letter-spacing:.2px; }
+    header h1{ font-size:14px; margin:0; font-weight:800; letter-spacing:.1px; }
     header .sub{ color:var(--m); font-size:12px; }
 
     .brand{
@@ -60,46 +62,57 @@
       flex:0 0 auto;
     }
     @media(max-width:520px){
-      header{ padding:12px 12px; }
+      header{ padding:10px 12px; }
       header .sub{ display:none; }
-      .brandlogo{ height:28px; }
+      .brandlogo{ height:26px; }
+      .wrap{ padding:12px; }
+      .card{ padding:12px; }
     }
-    button{ min-height:40px; }
+    button{ min-height:40px; transition: background .12s, opacity .12s, box-shadow .12s; }
+    button:not(:disabled):hover{ filter: brightness(.96); }
+    button:not(:disabled):active{ transform: translateY(1px); }
 
-    .wrap{ max-width:1200px; margin:0 auto; padding:16px; }
-    .grid{ display:grid; gap:14px; grid-template-columns:1fr; }
+    .wrap{ max-width:1200px; margin:0 auto; padding:18px 16px; }
+    .grid{ display:grid; gap:16px; grid-template-columns:1fr; }
     @media(min-width:980px){ .grid{ grid-template-columns: 360px 1fr; } }
 
     .card{
       background:var(--card);
       border:1px solid var(--b);
       border-radius:var(--radius);
-      padding:14px;
+      padding:16px;
       box-shadow:var(--shadow);
       max-width:100%;
       overflow:hidden;
+      transition: box-shadow .15s;
     }
 
     .topline{
       display:flex; gap:10px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;
     }
-    .title{ font-size:16px; font-weight:950; margin:0; }
+    .title{ font-size:16px; font-weight:900; margin:0; letter-spacing:-.2px; }
     .muted{ color:var(--m); font-size:12px; }
     .mono{ font-family:var(--mono); }
 
-    label{ display:block; font-size:12px; color:var(--m); margin:10px 0 6px; }
+    label{ display:block; font-size:12px; color:var(--m); margin:10px 0 5px; font-weight:500; }
     input, select, textarea{
       width:100%;
       padding:10px 11px;
       border:1px solid var(--b);
-      border-radius:12px;
+      border-radius:10px;
       background:#fff;
       font-size:14px;
       outline:none;
+      color: var(--t);
     }
+    input:disabled, textarea:disabled{ background:#f8fafc; color:var(--m); }
     input:focus, textarea:focus, select:focus{
       border-color:rgba(14,165,233,.55);
       box-shadow:0 0 0 4px rgba(14,165,233,.12);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input, select, textarea{
+      transition: border-color .15s;
     }
     textarea{ min-height:90px; resize:vertical; }
 
@@ -107,13 +120,13 @@
     button{
       border:1px solid var(--b);
       background:#fff;
-      padding:10px 12px;
-      border-radius:12px;
+      padding:9px 14px;
+      border-radius:10px;
       cursor:pointer;
-      font-weight:900;
+      font-weight:700;
       font-size:13px;
     }
-    button.primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
+    button.primary{ background:var(--accent); color:#fff; border-color:var(--accent); letter-spacing:.01em; }
     button.secondary{
       background:rgba(14,165,233,.08);
       border-color:rgba(14,165,233,.35);
@@ -124,15 +137,36 @@
 
     .hr{ height:1px; background:var(--b); margin:14px 0; }
 
+    /* Toast notifications */
+    #toast{
+      position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(100px);
+      background:var(--accent); color:#fff;
+      padding:10px 20px; border-radius:12px;
+      font-size:13px; font-weight:700;
+      box-shadow:0 8px 24px rgba(0,0,0,.18);
+      z-index:99999; pointer-events:none;
+      transition: transform .25s cubic-bezier(.34,1.56,.64,1), opacity .2s;
+      opacity:0;
+      white-space:nowrap;
+      max-width:80vw;
+    }
+    #toast.show{
+      transform:translateX(-50%) translateY(0);
+      opacity:1;
+    }
+    #toast.error{ background:var(--danger); }
+    #toast.success{ background:#16a34a; }
+
     .kpi{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
     .kpi .box{
       border:1px solid var(--b);
       border-radius:14px;
-      padding:10px 12px;
-      background:linear-gradient(180deg,#fff, #fbfbfe);
-      min-width:140px;
+      padding:12px 14px;
+      background:linear-gradient(145deg,#fff 60%, #f8fafc);
+      min-width:130px;
+      box-shadow: 0 1px 3px rgba(15,23,42,.04);
     }
-    .kpi .box b{ display:block; font-size:18px; }
+    .kpi .box b{ display:block; font-size:20px; font-weight:900; letter-spacing:-.5px; }
 
     .hide{ display:none !important; }
     .row2{ display:flex; gap:10px; flex-wrap:wrap; }
@@ -143,47 +177,52 @@
     .pill{
       display:inline-block; padding:3px 10px;
       border-radius:999px;
-      font-size:12px;
+      font-size:11px;
       border:1px solid var(--b);
-      font-weight:950;
+      font-weight:800;
+      letter-spacing:.02em;
     }
-    .ok{ border-color:var(--okbd); background:var(--okbg); }
-    .ko{ border-color:var(--kobd); background:var(--kobg); }
+    .ok{ border-color:var(--okbd); background:var(--okbg); color:#15803d; }
+    .ko{ border-color:var(--kobd); background:var(--kobg); color:#be123c; }
 
     .tag{
       display:inline-block;
-      padding:3px 10px;
+      padding:2px 9px;
       border:1px solid var(--b);
       border-radius:999px;
-      font-size:12px;
+      font-size:11px;
       color:var(--m);
-      background:#fff;
-      font-weight:800;
+      background:#f8fafc;
+      font-weight:700;
+      letter-spacing:.02em;
     }
 
     .right{ text-align:right; }
 
     .controlCard{
       border:1px solid var(--b);
-      border-radius:16px;
-      padding:12px;
+      border-radius:12px;
+      padding:12px 14px;
       background:#fff;
       margin-top:10px;
+      transition: border-color .15s;
     }
+    .controlCard:hover{ border-color:#cbd5e1; }
     .controlTitle{
       display:flex; align-items:center; justify-content:space-between;
       gap:10px; flex-wrap:wrap;
     }
     .controlTitle b{ font-size:14px; font-weight:950; }
 
-    .smallbtn{ padding:7px 10px; border-radius:10px; font-size:12px; }
+    .smallbtn{ padding:6px 11px; border-radius:8px; font-size:12px; font-weight:600; }
 
     .tableWrap{
       overflow:auto;
       border:1px solid var(--b);
-      border-radius:14px;
+      border-radius:12px;
       background:#fff;
       max-width:100%;
+      box-shadow: 0 1px 2px rgba(15,23,42,.04);
     }
     table{
       border-collapse:separate;
@@ -202,13 +241,15 @@
     th{
       position:sticky;
       top:0;
-      background:#fff;
+      background:#fafafa;
       z-index:2;
-      font-size:12px;
+      font-size:11px;
       color:var(--m);
-      font-weight:950;
+      font-weight:700;
+      letter-spacing:.03em;
+      text-transform:uppercase;
     }
-    tr:hover td{ background:#fafaff; }
+    tr:hover td{ background:#f8fafc; }
 
     .cellWrap{
       max-width:320px;
@@ -222,19 +263,20 @@
     }
     .noteBox{
       margin-top:8px;
-      padding:10px 12px;
-      border:1px dashed rgba(14,165,233,.35);
-      background:rgba(14,165,233,.06);
-      border-radius:14px;
-      color:#075985;
+      padding:10px 14px;
+      border:1px solid rgba(14,165,233,.25);
+      background:rgba(14,165,233,.05);
+      border-radius:10px;
+      color:#0369a1;
       font-size:12px;
-      line-height:1.35;
+      line-height:1.45;
     }
   
   
     .cardsGrid{ display:grid; gap:12px; grid-template-columns: 1fr; }
     @media(min-width:740px){ .cardsGrid{ grid-template-columns: 1fr 1fr; } }
-    .prodCard{ border:1px solid var(--b); border-radius:16px; padding:12px; background:#fff; box-shadow: 0 6px 18px rgba(15,23,42,.05); }
+    .prodCard{ border:1px solid var(--b); border-radius:12px; padding:14px; background:#fff; box-shadow: var(--shadow); transition: box-shadow .15s, border-color .15s; }
+    .prodCard:hover{ box-shadow: var(--shadow-hover); border-color:#cbd5e1; }
     .prodCardTop{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; }
     .prodCardCode{ font-family:var(--mono); font-weight:950; }
     .prodCardName{ font-weight:900; margin-top:2px; }
@@ -247,22 +289,27 @@
   /* ===== CoA Modal ===== */
   .overlay{
     position:fixed; inset:0;
-    background:rgba(0,0,0,.35);
+    background:rgba(15,23,42,.4);
+    backdrop-filter:blur(2px);
     display:flex; align-items:center; justify-content:center;
     z-index:9999;
+    animation: fadeIn .15s ease;
   }
+  @keyframes fadeIn{ from{ opacity:0; } to{ opacity:1; } }
   .overlay.hide{ display:none; }
   .modal{
     color:#111;
     width:min(760px, 92vw);
-    max-height:86vh;
+    max-height:88vh;
     overflow:auto;
     background:#ffffff;
-    border:1px solid rgba(0,0,0,.12);
-    border-radius:14px;
-    box-shadow: 0 20px 60px rgba(0,0,0,.6);
-    padding:16px;
+    border:1px solid rgba(0,0,0,.08);
+    border-radius:16px;
+    box-shadow: 0 24px 80px rgba(15,23,42,.28);
+    padding:20px;
+    animation: slideUp .18s cubic-bezier(.34,1.56,.64,1);
   }
+  @keyframes slideUp{ from{ transform:translateY(12px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
   .modal h3{ margin:0 0 6px 0; }
   .modal input, .modal select, .modal textarea{ color:#111; background:#fff; border:1px solid rgba(0,0,0,.18); }
   .modal input::placeholder{ color:rgba(0,0,0,.55); }
@@ -271,18 +318,21 @@
   .checklist{
     display:grid;
     grid-template-columns: 1fr 1fr;
-    gap:10px 14px;
+    gap:8px 12px;
     margin-top:10px;
   }
   .checkitem{
     display:flex;
     gap:10px;
     align-items:flex-start;
-    padding:10px;
-    border:1px solid rgba(0,0,0,.10);
-    border-radius:12px;
-    background:rgba(0,0,0,.03);
+    padding:9px 12px;
+    border:1px solid rgba(0,0,0,.08);
+    border-radius:10px;
+    background:#fafafa;
+    transition: background .1s, border-color .1s;
+    cursor:pointer;
   }
+  .checkitem:hover{ background:#f1f5f9; border-color:rgba(14,165,233,.3); }
   .checkitem b{ display:block; line-height:1.1; }
   .checkitem .muted{ font-size:12px; }
   @media (max-width:560px){
@@ -293,14 +343,15 @@
 /* Autocomplete codice prodotto */
 .suggest{ position:relative; }
 .suggest .panel{
-  position:absolute; left:0; right:0; top:0;
-  margin-top:6px;
+  position:absolute; left:0; right:0; top:100%;
+  margin-top:4px;
   background:#fff;
-  border:1px solid #e5e7eb;
+  border:1px solid #e2e8f0;
   border-radius:10px;
-  box-shadow:0 8px 20px rgba(0,0,0,.08);
-  overflow:hidden;
+  box-shadow:0 8px 24px rgba(15,23,42,.10);
+  overflow-y:auto;
   z-index:50;
+  max-height:220px;
 }
 .suggest .item{
   padding:10px 12px;
@@ -313,27 +364,18 @@
 .suggest .code{ font-weight:700; }
 .suggest .name{ color:#6b7280; font-size:.9em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-
-button{ transition:transform .14s ease, box-shadow .14s ease, background-color .14s ease, border-color .14s ease; }
-button:hover:not(:disabled){ transform:translateY(-1px); box-shadow:0 8px 18px rgba(15,23,42,.08); }
-button.primary:hover:not(:disabled){ box-shadow:0 10px 22px rgba(17,24,39,.16); }
-input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease, background-color .14s ease; }
-.controlCard, .prodCard, .card .box{ transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
-.controlCard:hover, .prodCard:hover{ box-shadow:0 10px 24px rgba(15,23,42,.07); border-color:#d8dee8; }
-#viewHome .controlCard{ background:linear-gradient(180deg,#fff 0%, #fcfdff 100%); }
-.title{ letter-spacing:.1px; }
-
 </style>
 </head>
 
 <body>
+<div id="toast"></div>
 <header>
   <div class="row">
     <div class="brand">
       <img class="brandlogo" src="assets/logo_vivcolor.png" alt="VivColor" />
       <div>
-        <h1>Registro Controlli VivColor</h1>
-        <div class="sub">Registro controlli cloud per laboratorio VivColor.</div>
+        <h1>Registro Controlli Qualità</h1>
+        <div class="sub">Dati sincronizzati nel cloud (Firestore)</div>
       </div>
     </div>
     <div class="muted" id="dbStatus">DB: pronto</div>
@@ -347,51 +389,51 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
     <div class="card">
       <div class="topline">
         <div>
-          <div class="muted">Accesso rapido</div>
-          <div class="title">Apri prodotto</div>
+          <div class="muted">Navigazione rapida</div>
+          <div class="title">Ricerca prodotto</div>
         </div>
       </div>
 
       <label>Codice prodotto (maiuscole/minuscole indifferenti)</label>
-      <input id="codeInput" placeholder="Es. 2ag1c / 2AG1C" autocomplete="off" />
+      <input id="codeInput" placeholder="Es. 2AG1C" autocomplete="off" />
       <div id="codeSuggest" class="suggest"></div>
 
       <div class="btns">
-        <button class="primary" id="openBtn">Apri scheda</button>
-        <button id="homeBtn">Dashboard</button>
-        <button class="secondary" id="allProductsBtn">Archivio prodotti</button>
-        <button class="secondary" id="statsBtn">Report</button>
+        <button class="primary" id="openBtn" aria-label="Apri scheda prodotto">Apri scheda</button>
+        <button id="homeBtn">Home</button>
+        <button class="secondary" id="allProductsBtn">Catalogo prodotti</button>
+        <button class="secondary" id="statsBtn">Statistiche</button>
       </div>
 
       <div class="hr"></div>
 
       <div class="topline">
-        <b>Backup completo</b>
+        <b>Backup &amp; Ripristino</b>
         <span class="tag">Consigliato</span>
       </div>
-      <div class="muted">Backup JSON completo per sicurezza.</div>
+      <div class="muted">Backup JSON completo di prodotti e controlli.</div>
 
       <div class="btns">
-<button id="backupJsonBtn">Esporta backup JSON</button>
+<button id="backupJsonBtn">Backup (JSON)</button>
         <label style="margin:0">
           <input type="file" id="restoreJsonFile" accept=".json" style="display:none" />
-          <button id="restoreJsonBtn">Ripristina backup JSON</button>
+          <button id="restoreJsonBtn">Ripristina (JSON)</button>
         </label>
       </div>
 
       <div class="hr"></div>
 
       <div class="topline">
-        <b>Admin</b>
-        <span class="tag">Cloud</span>
+        <b>Amministrazione</b>
+        <span class="tag">Accesso cloud</span>
       </div>
 
       <div class="btns">
-        <button class="danger" id="wipeBtn">Reset database cloud</button>
+        <button class="danger" id="wipeBtn">Svuota database cloud</button>
       </div>
 
       <div class="btns">
-        <button id="operatorsBtn" class="secondary">Operatori</button>
+        <button id="operatorsBtn" class="secondary">Gestione operatori</button>
       </div>
 
       <div class="kpi">
@@ -407,11 +449,13 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
       <div id="viewHome">
         <div class="topline">
           <div>
-            <div class="muted">Panoramica operativa</div>
+            <div class="muted">Dashboard</div>
             <div class="title">Home</div>
           </div>
         </div>
-        <div class="muted" style="margin-top:10px; line-height:1.5;">Scrivi un codice prodotto per aprire la scheda, creare un nuovo articolo o riprendere rapidamente il lavoro in corso.</div>
+        <div class="muted" style="margin-top:10px; line-height:1.5;">
+          Scrivi un codice e premi <b>Apri scheda</b>. Se registri un lotto già usato, il sistema ti chiede conferma.
+        </div>
 
         <div class="hr"></div>
 
@@ -420,10 +464,10 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             <div class="muted">Riprendi lavoro</div>
             <div class="title">Bozze in sospeso</div>
           </div>
-          <span class="tag">Priorità</span>
+          <span class="tag">Da completare</span>
         </div>
 
-        <div class="muted">Controlli salvati in bozza, pronti da completare senza rifare la compilazione.</div>
+        <div class="muted">Controlli salvati in bozza, pronti da completare.</div>
 
         <div id="homeDraftChecks" style="margin-top:12px"></div>
 
@@ -431,14 +475,14 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
         <div class="topline">
           <div>
-            <div class="muted">Panoramica recente</div>
+            <div class="muted">Panoramica</div>
             <div class="title">Ultimi 5 prodotti controllati</div>
           </div>
-          <span class="tag">Rapido</span>
+          <span class="tag">Accesso rapido</span>
         </div>
 
         <div class="muted">
-          Ultimo lotto e ultimo operatore qualità per riaprire in un attimo la scheda prodotto.
+          Lotto e firma dell’ultimo controllo. Clicca per aprire la scheda prodotto.
         </div>
 
         <div id="homeRecentProducts" style="margin-top:12px"></div>
@@ -448,11 +492,11 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
       <div id="viewAllProducts" class="hide">
         <div class="topline">
           <div>
-            <div class="muted">Elenco</div>
-            <div class="title">Archivio prodotti</div>
+            <div class="muted">Catalogo</div>
+            <div class="title">Tutti i prodotti</div>
           </div>
           <div class="btns" style="margin-top:0">
-            <button id="backFromAllProductsBtn">Dashboard</button>
+            <button id="backFromAllProductsBtn">&larr; Home</button>
           </div>
         </div>
 
@@ -464,12 +508,12 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             <div class="muted">Filtri</div>
             <div class="title">Cerca</div>
           </div>
-          <span class="tag">Mobile-friendly</span>
+          <span class="tag">Filtra</span>
         </div>
 
         <div class="row2" style="margin-top:10px;">
           <div>
-            <label style="margin-top:0">Ricerca per codice, nome, lotto o operatore</label>
+            <label style="margin-top:0">Cerca per codice / nome / lotto / operatore</label>
             <input id="allProductsSearch" placeholder="Scrivi per filtrare..." autocomplete="off" />
           </div>
           <div>
@@ -486,10 +530,10 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
         <div class="topline">
           <div>
-            <div class="muted">Elenco</div>
-            <div class="title">Elenco prodotti</div>
+            <div class="muted">Catalogo</div>
+            <div class="title">Tutti i prodotti</div>
           </div>
-          <span class="tag">Rapido</span>
+          <span class="tag">Ordinati per codice</span>
         </div>
 
         <div id="allProductsCards" style="margin-top:12px;"></div>
@@ -517,21 +561,22 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
       <div id="viewProduct" class="hide">
         <div class="topline">
           <div>
-            <div class="muted">Dettaglio prodotto</div>
+            <div class="muted">Scheda prodotto</div>
             <div class="title" id="prodTitle">—</div>
             <div class="muted" id="prodMeta">—</div>
           </div>
           <div class="btns" style="margin-top:0">
-            <button id="editSetupBtn">Configura controlli</button>
+            <button id="editSetupBtn">Modifica setup</button>
             <button class="primary" id="newCheckBtn">Nuovo controllo</button>
             <button id="historyBtn">Storico controlli</button>
+            <button class="secondary" id="exportProdCsvBtnLeft">Esporta CSV</button>
 </div>
         </div>
 
         <div class="hr"></div>
 
         <div class="topline">
-          <b>NOTE (operative fisse)</b>
+          <b>Note operative prodotto</b>
           <span class="tag">Sempre visibili</span>
         </div>
         <div class="controlCard">
@@ -542,8 +587,8 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
         <div class="hr"></div>
 
         <div class="topline">
-          <b>Standard attuali</b>
-          <span class="tag">Setup</span>
+          <b>Standard di controllo</b>
+          <span class="tag">Configurazione attuale</span>
         </div>
         <div class="tableWrap" style="margin-top:10px;">
           <table id="stdTable">
@@ -563,8 +608,8 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
         <div class="hr"></div>
 
         <div class="topline">
-          <b>Ultimi 5 controlli (vista rapida)</b>
-          <span class="tag">Confronto veloce</span>
+          <b>Ultimi 5 controlli</b>
+          <span class="tag">Rapido</span>
         </div>
 
         <div class="tableWrap" style="margin-top:10px;">
@@ -581,10 +626,10 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
   <div class="topline">
     <div>
       <div class="muted">Dashboard</div>
-      <div class="title">Report controlli</div>
+      <div class="title">Statistiche</div>
     </div>
     <div class="btns" style="margin-top:0">
-      <button id="statsBackBtn">Dashboard</button>
+      <button id="statsBackBtn">&larr; Home</button>
     </div>
   </div>
 
@@ -681,16 +726,16 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
         <label>Nome prodotto</label>
         <input id="newProdName" placeholder="Nome prodotto..." />
 
-        <label>NOTE (operative fisse)</label>
+        <label>Note operative (visibili durante ogni controllo)</label>
         <textarea id="newProdNOTE" placeholder="Note operative fisse (visibili sempre)"></textarea>
 
         <div class="hr"></div>
 
         <div class="topline">
-          <b>Setup controlli</b>
-          <span class="tag">Puoi eliminare</span>
+          <b>Configurazione controlli</b>
+          <span class="tag">Personalizzabile</span>
         </div>
-        <div class="muted">Se lo standard resta vuoto, quel controllo non viene richiesto durante il controllo.</div>
+        <div class="muted">Se lo standard resta vuoto, quel controllo non viene richiesto durante il controllo qualità.</div>
 
         <div id="setupControlsNew"></div>
 
@@ -708,7 +753,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             <div class="title" id="setupTitle">—</div>
           </div>
           <div class="btns" style="margin-top:0">
-            <button id="setupBackBtn">Torna a scheda</button>
+            <button id="setupBackBtn">&larr; Torna a scheda</button>
             <button class="primary" id="setupSaveBtn">Salva setup</button>
           </div>
         </div>
@@ -725,14 +770,14 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
           </div>
         </div>
 
-        <label>NOTE (operative fisse)</label>
+        <label>Note operative (visibili durante ogni controllo)</label>
         <textarea id="setupNOTE"></textarea>
 
         <div class="hr"></div>
 
         <div class="topline">
-          <b>Controlli</b>
-          <span class="tag">Attiva / Elimina</span>
+          <b>Controlli configurati</b>
+          <span class="tag">Attiva / Disattiva / Elimina</span>
         </div>
         <div id="setupControlsEdit"></div>
 
@@ -754,8 +799,8 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
         <!-- NOTE fisse prima voce -->
         <div class="hr"></div>
         <div class="topline">
-          <b>NOTE (operative fisse)</b>
-          <span class="tag">Prima voce</span>
+          <b>Note operative prodotto</b>
+          <span class="tag">Riferimento fisso</span>
         </div>
         <div class="controlCard">
           <div class="muted">Note fisse prodotto:</div>
@@ -766,8 +811,8 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
         <div class="row2">
           <div>
-            <label>Data/ora (automatica)</label>
-            <input id="checkDate" type="datetime-local" disabled />
+            <label>Data/ora <span class="tag" style="font-size:10px">automatica</span></label>
+            <input id="checkDate" type="datetime-local" disabled style="opacity:.7;cursor:not-allowed" />
           </div>
           <div>
             <label>Lotto (obbligatorio)</label>
@@ -781,15 +826,15 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
           <b>Controlli</b>
           <span class="tag">OK / Fuori STD</span>
         </div>
-        <div class="muted">Mostro solo i controlli che hanno uno standard compilato.</div>
+        <div class="muted">Sono mostrati solo i controlli con standard compilato. I valori mancanti risulteranno Fuori STD.</div>
 
         <div id="checkRows" style="margin-top:10px"></div>
 
         <div class="hr"></div>
 
         <div class="topline">
-          <b>Campi sempre presenti</b>
-          <span class="tag">Meta</span>
+          <b>Dati aggiuntivi</b>
+          <span class="tag">Facoltativo</span>
         </div>
 
         <label>Aggiunte</label>
@@ -815,7 +860,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
           </div>
         </div>
 
-        <div class="muted" style="margin-top:10px">Bozza: salva tutti i dati inseriti e riprendi dalla Home. Nota: eventuali PDF allegati vanno reinseriti quando fai il salvataggio definitivo.</div>
+        <div class="muted" style="margin-top:10px">La bozza salva tutti i dati inseriti e li rende disponibili dalla Home. I PDF allegati non vengono salvati in bozza: inseriscili al momento del salvataggio definitivo.</div>
 
         <div class="btns">
           <button id="saveDraftBtn" class="secondary">Salva bozza</button>
@@ -832,8 +877,8 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             <div class="title" id="histTitle">—</div>
           </div>
           <div class="btns" style="margin-top:0">
-            <button id="backToProdBtn">Torna a scheda</button>
-            <button id="exportHistCsvBtn" class="secondary">Esporta (CSV)</button>
+            <button id="backToProdBtn">&larr; Torna a scheda</button>
+            <button id="exportHistCsvBtn" class="secondary">Esporta CSV</button>
           </div>
         </div>
 
@@ -873,7 +918,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             <div class="muted" id="detailMeta">—</div>
           </div>
           <div class="btns" style="margin-top:0">
-            <button id="detailBackBtn">Indietro</button>
+            <button id="detailBackBtn">&larr; Indietro</button>
             <button id="detailCoABtn">Certificato di analisi (PDF)</button>
             <button class="primary" id="detailSaveBtn">Salva modifiche</button>
           </div>
@@ -882,8 +927,8 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
         <div class="hr"></div>
 
         <div class="topline">
-          <b>NOTE (operative fisse)</b>
-          <span class="tag">Riferimento</span>
+          <b>Note operative prodotto</b>
+          <span class="tag">Riferimento fisso</span>
         </div>
         <div class="controlCard">
           <div class="muted">Note fisse prodotto:</div>
@@ -907,7 +952,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
         <div class="topline">
           <b>Valori controlli</b>
-          <span class="tag">Modificabili (tutti attivi)</span>
+          <span class="tag">Modificabili</span>
         </div>
 
         <div id="detailControls"></div>
@@ -915,7 +960,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
         <div class="hr"></div>
 
         <div class="topline">
-          <b>Meta</b>
+          <b>Dati aggiuntivi</b>
           <span class="tag">Aggiunte / Note / Firme</span>
         </div>
 
@@ -949,7 +994,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             <div class="title">Gestione operatori</div>
           </div>
           <div class="btns" style="margin-top:0">
-            <button id="operatorsBackBtn">Dashboard</button>
+            <button id="operatorsBackBtn">&larr; Home</button>
           </div>
         </div>
 
@@ -1017,7 +1062,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             <div class="muted" id="opHistMeta">—</div>
           </div>
           <div class="btns" style="margin-top:0">
-            <button id="backToOperatorsBtn">Indietro</button>
+            <button id="backToOperatorsBtn">&larr; Indietro</button>
           </div>
         </div>
 
@@ -1044,8 +1089,8 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
         <div class="topline">
           <div>
-            <div class="muted">Ultimi controlli</div>
-            <div class="title">Lista (max 100)</div>
+            <div class="muted">Storico controlli</div>
+            <div class="title">Lista controlli</div>
           </div>
         </div>
 
@@ -1126,6 +1171,17 @@ function on(id, evt, fn){
   const el = document.getElementById(id);
   if(el) el.addEventListener(evt, fn);
 }
+// Toast notifications (replace alert for non-critical feedback)
+let __toastTimer = null;
+function showToast(msg, type="", duration=2800){
+  const t = document.getElementById("toast");
+  if(!t) return;
+  t.textContent = msg;
+  t.className = type ? ("show " + type) : "show";
+  clearTimeout(__toastTimer);
+  __toastTimer = setTimeout(()=>{ t.className = t.className.replace("show","").trim(); }, duration);
+}
+
 // Shim for libraries that expect Node-style process/env
 window.process = window.process || { env: { NODE_ENV: "production" } };
 window.global = window.global || window;
@@ -1333,13 +1389,14 @@ async function getAllByIndex(store, indexName, value){
 
 
 async function deleteProductAndChecks(code){
-  // delete product doc
-  await deleteDoc(doc(fs, COL_PRODUCTS, code));
-  // delete all checks with that code (no orderBy -> no composite index required)
+  // delete product doc + all its checks in parallel batches
   const qy = query(collection(fs, COL_CHECKS), where("code", "==", code));
-  const snap = await getDocs(qy);
-  for(const d of snap.docs){
-    await deleteDoc(doc(fs, COL_CHECKS, d.id));
+  const [, snap] = await Promise.all([
+    deleteDoc(doc(fs, COL_PRODUCTS, code)),
+    getDocs(qy)
+  ]);
+  if(!snap.empty){
+    await Promise.all(snap.docs.map(d => deleteDoc(doc(fs, COL_CHECKS, d.id))));
   }
 }
 
@@ -1372,16 +1429,15 @@ async function renameProductAndChecks(oldCode, newCode){
 }
 
 async function wipeAllFirestore(){
-  // Deletes everything in products + checks (safe for small datasets)
-  const ps = await getDocs(collection(fs, COL_PRODUCTS));
-  for (const d of ps.docs) {
-    await deleteDoc(doc(fs, COL_PRODUCTS, d.id));
-  }
-  
-  const cs = await getDocs(collection(fs, COL_CHECKS));
-  for (const d of cs.docs) {
-    await deleteDoc(doc(fs, COL_CHECKS, d.id));
-  }
+  // Deletes everything in products + checks using parallel fetches + batched deletes
+  const [ps, cs] = await Promise.all([
+    getDocs(collection(fs, COL_PRODUCTS)),
+    getDocs(collection(fs, COL_CHECKS))
+  ]);
+  await Promise.all([
+    ...ps.docs.map(d => deleteDoc(doc(fs, COL_PRODUCTS, d.id))),
+    ...cs.docs.map(d => deleteDoc(doc(fs, COL_CHECKS, d.id)))
+  ]);
 }
 
 /* =========================
@@ -1448,6 +1504,8 @@ async function fetchBytesFromUrl(url){
 
 // Logo VivColor (inline SVG). Se vuoi sostituirlo con il logo ufficiale, basta rimpiazzare questa dataURL.
 const VIVCOLOR_LOGO_URL = "assets/logo_vivcolor.png";
+const COA_HEADER_URL = "assets/coa_header.png";
+const COA_FOOTER_URL = "assets/coa_footer.png";
 
 
 function base64ToUint8Array(b64){
@@ -2130,19 +2188,19 @@ async function fetchDraftChecks(){
 async function renderHomeDraftChecks(){
   const box = document.getElementById("homeDraftChecks");
   if(!box) return;
-  box.innerHTML = '<div class="muted">Caricamento…</div>';
+  box.innerHTML = '<div class="muted" style="padding:8px 0">Caricamento bozze…</div>';
   const drafts = await fetchDraftChecks();
   if(!drafts.length){
-    box.innerHTML = '<div class="muted">Nessuna bozza salvata.</div>';
+    box.innerHTML = '<div class="muted" style="padding:8px 0; font-style:italic">Nessuna bozza salvata.</div>';
     return;
   }
   box.innerHTML = drafts.map(d=> `
     <div class="controlCard" style="margin-top:10px">
       <div class="topline" style="align-items:center">
         <div>
-          <div style="font-weight:950">${esc(d.code || "—")} — ${esc(d.name || "")}</div>
-          <div class="muted">Ultima modifica: ${esc(fmtDateTime(d.updatedAtISO || d.createdAtISO || d.dateISO || ""))}</div>
-          <div class="muted">Lotto: <span class="mono">${esc(d.lotto || "—")}</span> • Stato: ${esc((d.outcome||"BOZZA").replaceAll("_"," "))}${d.corretto ? ' • <span class="tag" title="Formula corretta tramite aggiunte">Corretto</span>' : ''}</div>
+          <div style="font-weight:800; font-size:14px"><span class="mono">${esc(d.code || "—")}</span>${d.name ? ' — ' + esc(d.name) : ''}</div>
+          <div class="muted" style="margin-top:2px">Modificata: ${esc(fmtDateTime(d.updatedAtISO || d.createdAtISO || d.dateISO || ""))}</div>
+          <div class="muted">Lotto: <span class="mono">${esc(d.lotto || "—")}</span> • Esito stimato: ${esc((d.outcome||"BOZZA").replaceAll("_"," "))}${d.corretto ? ' • <span class="tag" title="Formula corretta tramite aggiunte">Corretto</span>' : ''}</div>
         </div>
         <div class="btns" style="margin-top:0">
           <button class="smallbtn secondary" data-draft-open="${esc(d.id)}">Riprendi</button>
@@ -2168,9 +2226,9 @@ async function renderHomeDraftChecks(){
 
 async function renderHomeRecentProducts(){
   const box = document.getElementById("homeRecentProducts");
-  if(!box) return;
-  box.innerHTML = '<div class="muted">Caricamento…</div>';
+  box.innerHTML = "";
 
+  // prendo ultimi controlli (limitati), poi estraggo max 5 codici unici
   let recentChecks = [];
   try{
     const qy = query(collection(fs, COL_CHECKS), orderBy("dateISO","desc"), limit(30));
@@ -2185,47 +2243,45 @@ async function renderHomeRecentProducts(){
   }
 
   const seen = new Set();
-  const picked = [];
+  const topChecks = [];
   for(const c of recentChecks){
-    if(!c?.code || seen.has(c.code)) continue;
+    if(!c?.code) continue;
+    if(seen.has(c.code)) continue;
     seen.add(c.code);
-    picked.push(c);
-    if(picked.length>=5) break;
+    topChecks.push(c);
+    if(topChecks.length>=5) break;
   }
 
-  const codeSet = [...new Set(picked.map(x=>x.code).filter(Boolean))];
-  const productNameMap = new Map();
-  try{
-    const docs = await Promise.all(codeSet.map(code=> getDoc(doc(fs, COL_PRODUCTS, code)).catch(()=>null)));
-    docs.forEach((snap, idx)=>{
-      if(snap?.exists()) productNameMap.set(codeSet[idx], snap.data()?.name || "");
-    });
-  }catch(err){
-    console.warn("renderHomeRecentProducts product preload failed:", err);
-  }
+  // Batch fetch all product docs in parallel
+  const productDocs = await Promise.all(
+    topChecks.map(c => getDoc(doc(fs, COL_PRODUCTS, c.code)).catch(()=>null))
+  );
 
-  const rows = picked.map(c=>({
-    code: c.code,
-    name: productNameMap.get(c.code) || "",
-    dateISO: c.dateISO,
-    lotto: c.lotto ?? "",
-    by: c.meta?.effettuatoDa ?? ""
-  }));
+  const rows = topChecks.map((c, i) => {
+    const snap = productDocs[i];
+    const p = (snap && snap.exists && snap.exists()) ? snap.data() : null;
+    return {
+      code: c.code,
+      name: p?.name ?? "",
+      dateISO: c.dateISO,
+      lotto: c.lotto ?? "",
+      by: c.meta?.effettuatoDa ?? ""
+    };
+  });
 
   if(rows.length===0){
-    box.innerHTML = `<div class="muted">Nessun controllo registrato.</div>`;
+    box.innerHTML = `<div class="muted" style="padding:8px 0; font-style:italic">Nessun controllo registrato.</div>`;
     return;
   }
 
-  box.innerHTML = "";
   for(const r of rows){
     const card = document.createElement("div");
     card.className = "controlCard";
     card.innerHTML = `
       <div class="topline" style="align-items:center">
         <div>
-          <div style="font-weight:950">${esc(r.code)} — ${esc(r.name)}</div>
-          <div class="muted">Ultimo: ${esc(fmtDateTime(r.dateISO))} • Lotto: <span class="mono">${esc(r.lotto)}</span> • Da: <span class="mono">${esc(r.by)}</span></div>
+          <div style="font-weight:800; font-size:14px"><span class="mono">${esc(r.code)}</span>${r.name ? ' — ' + esc(r.name) : ''}</div>
+          <div class="muted" style="margin-top:2px">${esc(fmtDateTime(r.dateISO))} &middot; Lotto: <span class="mono">${esc(r.lotto || "—")}</span> &middot; Da: <span class="mono">${esc(r.by || "—")}</span></div>
         </div>
         <button class="smallbtn secondary" data-openprod="${esc(r.code)}">Apri</button>
       </div>
@@ -2251,7 +2307,7 @@ function renderAllProductsTable
 
   if(list.length===0){
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="8" class="muted">Nessun prodotto trovato con i filtri attuali.</td>`;
+    tr.innerHTML = `<td colspan="8" class="muted">Nessun prodotto trovato.</td>`;
     body.appendChild(tr);
     return;
   }
@@ -2473,14 +2529,39 @@ function renderLastChecks5(product, checks){
       await openCheckDetailPage(btn.getAttribute("data-open"));
     });
   });
+
+  body.querySelectorAll("button[data-delcheck]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.getAttribute("data-delcheck");
+      if(!id) return;
+      if(!confirm("Eliminare questo controllo? Operazione irreversibile.")) return;
+      try{
+        await deleteDoc(doc(fs, COL_CHECKS, id));
+        await refreshKPIs();
+        await loadProduct(currentCode);
+      }catch(err){
+        console.error(err);
+        alert("Errore eliminazione: " + (err?.message || err));
+      }
+    });
+  });
 }
 
 async function loadProduct(rawCode){
   const code = normalizeCode(rawCode);
   if(!code) return;
 
-  const t = tx([STORES.products]);
-  const p = await get(t.objectStore(STORES.products), code);
+  const openBtn = document.getElementById("openBtn");
+  const prevOpenText = openBtn?.textContent;
+  if(openBtn){ openBtn.disabled = true; openBtn.textContent = "Caricamento…"; }
+
+  let p;
+  try{
+    const t = tx([STORES.products]);
+    p = await get(t.objectStore(STORES.products), code);
+  }finally{
+    if(openBtn){ openBtn.disabled = false; openBtn.textContent = prevOpenText || "Apri scheda"; }
+  }
 
   if(!p){
     workingControlsNew = deepClone(DEFAULT_CONTROLS);
@@ -2719,8 +2800,10 @@ async function saveNewProduct(){
   const t = tx([STORES.products], "readwrite");
   await put(t.objectStore(STORES.products), p);
 
+  // Invalidate product mini-cache so autocomplete reflects new product
+  window.__productsMiniCache = null;
   await refreshKPIs();
-  await renderHomeRecentProducts();
+  await Promise.all([renderHomeDraftChecks(), renderHomeRecentProducts()]);
   await loadProduct(code);
 }
 
@@ -2781,6 +2864,8 @@ async function saveSetup(){
       await put(t.objectStore(STORES.products), p);
     }
 
+    // Invalidate autocomplete cache
+    window.__productsMiniCache = null;
     await loadProduct(newCode);
   }catch(err){
     console.error(err);
@@ -2981,7 +3066,7 @@ async function saveCheckDraft(options={}){
     currentDraftId = draftId;
     setDraftUiState(true);
     await renderHomeDraftChecks();
-    if(!options.silent) alert("Bozza salvata.");
+    if(!options.silent) showToast("Bozza salvata", "success");
     if(options.exitAfterSave){
       await loadProduct(p.code);
     }
@@ -3006,7 +3091,7 @@ async function deleteDraftCheck(draftId=currentDraftId, options={}){
       setDraftUiState(false);
     }
     await renderHomeDraftChecks();
-    if(!options.silent) alert("Bozza eliminata.");
+    if(!options.silent) showToast("Bozza eliminata");
     return true;
   }catch(err){
     console.error(err);
@@ -3224,9 +3309,9 @@ async function saveCheck(){
       await deleteDraftCheck(currentDraftId, { silent:true });
     }
 
-    await refreshKPIs();
-    await renderHomeRecentProducts();
-    await renderHomeDraftChecks();
+    suppressBeforeUnloadWarning = true;
+    await Promise.all([refreshKPIs(), renderHomeRecentProducts(), renderHomeDraftChecks()]);
+    showToast("Controllo salvato con successo", "success");
     await loadProduct(p.code);
   }finally{
     isCheckSaving = false;
@@ -3715,7 +3800,7 @@ async function saveDetail(){
   if(lastReturnView === "history") await renderHistory();
 
   await renderHomeRecentProducts();
-  alert("Modifiche salvate.");
+  showToast("Modifiche salvate", "success");
 }
 
 /* =========================
@@ -3776,6 +3861,11 @@ async function restoreBackup(obj){
 
   // Svuota il DB CLOUD (Firestore), poi reinserisce
   await wipeAllFirestore();
+  // Clear cloud drafts as well
+  try{
+    const ds = await getDocs(collection(fs, COL_DRAFTS));
+    if(!ds.empty) await Promise.all(ds.docs.map(d => deleteDoc(doc(fs, COL_DRAFTS, d.id))));
+  }catch(_){}
 
   const t = tx([STORES.products, STORES.checks], "readwrite");
 
@@ -3876,16 +3966,32 @@ document.addEventListener("click",(e)=>{
 on("openBtn","click",async ()=>{
   const code = normalizeCode(document.getElementById("codeInput").value);
   if(!code) return alert("Inserisci un codice.");
+  hideCodeSuggestions();
   await loadProduct(code);
 });
+
+// Also trigger on Enter key in code input
+(function(){
+  const inp = document.getElementById("codeInput");
+  if(inp) inp.addEventListener("keydown", async (e)=>{
+    if(e.key !== "Enter") return;
+    const code = normalizeCode(inp.value);
+    if(!code) return;
+    hideCodeSuggestions();
+    await loadProduct(code);
+  });
+})();
 
 on("homeBtn","click",async ()=>{
   currentCode=null;
   cachedProduct=null;
   document.getElementById("codeInput").value = "";
   showView("home");
-  await refreshKPIs();
-  await renderHomeRecentProducts();
+  await Promise.all([
+    refreshKPIs(),
+    renderHomeDraftChecks(),
+    renderHomeRecentProducts()
+  ]);
 });
 
 on("allProductsBtn","click",async ()=>{
@@ -3900,13 +4006,21 @@ on("statsBtn","click",async ()=>{
 
 on("backFromAllProductsBtn","click",async ()=>{
   showView("home");
-  await renderHomeRecentProducts();
+  await Promise.all([renderHomeDraftChecks(), renderHomeRecentProducts()]);
 });
 
-on("statsBackBtn","click",()=> showView("home"));
+on("statsBackBtn","click",async ()=>{
+  showView("home");
+  await Promise.all([renderHomeDraftChecks(), renderHomeRecentProducts()]);
+});
 on("statsRunBtn","click",runStats);
+on("statsPeriod","change",runStats);
+on("statsYear","change",runStats);
 
-on("cancelNewProdBtn","click",()=> showView("home"));
+on("cancelNewProdBtn","click",async ()=>{
+  showView("home");
+  await Promise.all([renderHomeDraftChecks(), renderHomeRecentProducts()]);
+});
 on("saveNewProdBtn","click",saveNewProduct);
 
 on("editSetupBtn","click",openSetup);
@@ -3917,9 +4031,17 @@ on("addCustomControlBtnNew","click",()=> addCustomControl("new"));
 on("addCustomControlBtnEdit","click",()=> addCustomControl("edit"));
 
 on("newCheckBtn","click",()=> startNewCheck());
-on("operatorsBtn","click",async ()=>{ await syncOperatorsFromCloud(); renderOperatorsList(); resetOperatorForm(); showView("operators"); });
+on("operatorsBtn","click",async ()=>{
+  resetOperatorForm();
+  showView("operators");
+  await syncOperatorsFromCloud();
+});
 on("operatorsBackBtn","click",()=> showView("home"));
-on("backToOperatorsBtn","click",()=>{ renderOperatorsList(); showView("operators"); });
+on("backToOperatorsBtn","click",()=>{
+  renderOperatorsList();
+  resetOperatorForm();
+  showView("operators");
+});
 
 on("cancelEditOperatorBtn","click",()=>{ resetOperatorForm(); });
 
@@ -3947,21 +4069,26 @@ on("saveOperatorBtn","click",async ()=>{
     try{ await upsertOperatorCloud(list[idx]); }catch(_){ }
     renderOperatorsList();
     resetOperatorForm();
-    alert("Operatore aggiornato ✅");
+    showToast("Operatore aggiornato", "success");
   } else {
-    list.push({ id: genId(), role, name, surname, code });
+    const newOp = { id: genId(), role, name, surname, code };
+    list.push(newOp);
     saveOperators(list);
-    try{ await upsertOperatorCloud(list[idx]); }catch(_){ }
+    try{ await upsertOperatorCloud(newOp); }catch(_){ }
     renderOperatorsList();
     resetOperatorForm();
-    alert("Operatore salvato ✅");
+    showToast("Operatore salvato", "success");
   }
 
   // aggiorna anche i picker nei controlli
   try{ renderOperatorPickers(); }catch(_){}
 });
 
-on("cancelCheckBtn","click",async ()=> loadProduct(currentCode));
+on("cancelCheckBtn","click",async ()=>{
+  const ok = await confirmAbandonNewCheck();
+  if(!ok) return;
+  await loadProduct(currentCode);
+});
 on("saveDraftBtn","click",()=> saveCheckDraft());
 on("deleteDraftBtn","click", async ()=>{
   if(!currentDraftId) return;
@@ -3981,6 +4108,13 @@ if(__lotInp && !__lotInp.__boundUpper){
     __lotInp.value = (__lotInp.value||"").toUpperCase();
     try{ __lotInp.setSelectionRange(p,p); }catch(_){ }
   });
+  // Enter moves focus to first value field
+  __lotInp.addEventListener("keydown", (e)=>{
+    if(e.key !== "Enter") return;
+    e.preventDefault();
+    const firstVal = document.querySelector("#checkRows input[data-val]");
+    if(firstVal) firstVal.focus();
+  });
 }
 
 on("historyBtn","click",async ()=>{
@@ -3994,8 +4128,8 @@ on("historyBtn","click",async ()=>{
 });
 on("backToProdBtn","click",async ()=> loadProduct(currentCode));
 on("filterOutcome","change",renderHistory);
-on("filterFrom","change",renderHistory);
-on("filterTo","change",renderHistory);
+on("filterFrom","change",()=>{ clearTimeout(window.__filterT); window.__filterT = setTimeout(renderHistory, 200); });
+on("filterTo","change",()=>{ clearTimeout(window.__filterT); window.__filterT = setTimeout(renderHistory, 200); });
 
 on("detailBackBtn","click",async ()=>{
   if(lastReturnView === "history"){
@@ -4033,8 +4167,10 @@ on("coaGenerateBtn","click",async ()=>{
 });
 
 on("exportHistCsvBtn","click",async ()=>{
+  if(!cachedProduct) return alert("Nessun prodotto aperto.");
   const checks = await getChecks(currentCode);
-  await exportChecksCSV(checks, `storico_${currentCode}.csv`);
+  const date = new Date().toISOString().slice(0,10);
+  await exportChecksCSV(checks, `storico_${currentCode}_${date}.csv`);
 });
 on("exportProdCsvBtnLeft","click",async ()=>{
   if(!cachedProduct) return alert("Apri prima un prodotto.");
@@ -4061,11 +4197,11 @@ on("restoreJsonFile","change",async (e)=>{
     const obj=JSON.parse(txt);
     if(!confirm("Ripristinare il backup? Sovrascrive i dati attuali.")) return;
     await restoreBackup(obj);
-    alert("Ripristino completato.");
+    window.__productsMiniCache = null;
+    window.__allProductsCache = null;
+    showToast("Ripristino completato", "success");
     showView("home");
-    await refreshKPIs();
-    await renderHomeRecentProducts();
-    await renderHomeDraftChecks();
+    await Promise.all([refreshKPIs(), renderHomeRecentProducts(), renderHomeDraftChecks()]);
   }catch(err){
     alert("Errore ripristino: " + err.message);
   }finally{
@@ -4088,14 +4224,22 @@ on("wipeBtn","click",async ()=>{
   const c2 = confirm("Ultima conferma: SVUOTO DAVVERO tutto il database cloud?");
   if(!c2) return;
 
+  // Also wipe drafts
+  try{
+    const ds = await getDocs(collection(fs, COL_DRAFTS));
+    if(!ds.empty) await Promise.all(ds.docs.map(d => deleteDoc(doc(fs, COL_DRAFTS, d.id))));
+  }catch(_){}
+  // Clear local drafts too
+  saveDraftChecksLocal([]);
+
   await wipeAllFirestore();
   currentCode = null;
   cachedProduct = null;
+  window.__productsMiniCache = null;
+  window.__allProductsCache = null;
   showView("home");
-  await refreshKPIs();
-  await renderHomeDraftChecks();
-  await renderAllProducts();
-  alert("Database cloud svuotato.");
+  await Promise.all([refreshKPIs(), renderHomeDraftChecks(), renderHomeRecentProducts()]);
+  showToast("Database svuotato", "success");
 });
 
 
@@ -4447,10 +4591,10 @@ async function renderOperatorHistory(op){
     if(body){
       body.innerHTML = list.map(c=>`
         <tr>
-          <td class="mono">${esc(c.dateISO||"")}</td>
+          <td class="mono">${esc(fmtDateTime(c.dateISO||""))}</td>
           <td class="mono">${esc(c.code||"")}</td>
           <td class="mono">${esc(c.lotto||"")}</td>
-          <td><span class="pill ${((c.outcome||"")==="OK")?"ok":"bad"}">${esc(c.outcome||"")}</span>${c.corretto ? ' <span class="tag" title="Formula corretta tramite aggiunte">Corretto</span>' : ''}</td>
+          <td><span class="pill ${((c.outcome||"")==="OK")?"ok":"ko"}">${esc((c.outcome||"")==="OK" ? "OK" : (c.outcome||"")!="" ? "Fuori STD" : "—")}</span>${c.corretto ? ' <span class="tag" title="Formula corretta tramite aggiunte">Corretto</span>' : ''}</td>
           <td class="right"><button class="smallbtn secondary" data-open="${esc(c.id)}">Apri</button></td>
         </tr>
       `).join("") || `<tr><td colspan="5" class="muted">—</td></tr>`;
@@ -4583,17 +4727,22 @@ function renderOperatorPickers(){
 ========================= */
 (async function init(){
   try{
-    document.getElementById("dbStatus").textContent = "DB: connesso";
+    const dbEl = document.getElementById("dbStatus");
+    dbEl.textContent = "DB: connesso";
+    dbEl.style.color = "var(--m)";
     showView("home");
+    // Load KPIs + home content in parallel for faster startup
     await Promise.all([
       refreshKPIs(),
-      renderHomeRecentProducts(),
       renderHomeDraftChecks(),
-      syncOperatorsFromCloud().catch(err=>console.warn("Sync operatori non disponibile:", err))
+      renderHomeRecentProducts()
     ]);
   }catch(err){
-    document.getElementById("dbStatus").textContent = "DB: ERRORE";
-    alert("Errore DB: " + err.message);
+    const dbEl2 = document.getElementById("dbStatus");
+    dbEl2.textContent = "DB: errore connessione";
+    dbEl2.style.color = "var(--danger)";
+    console.error("Init error:", err);
+    alert("Errore avvio: " + err.message);
   }
 })();
 
@@ -4681,9 +4830,8 @@ async function deleteProductFlow(code){
       showView("home");
     }
 
-    await refreshKPIs();
-    await renderHomeRecentProducts();
-    await renderHomeDraftChecks();
+    window.__productsMiniCache = null;
+    await Promise.all([refreshKPIs(), renderHomeRecentProducts(), renderHomeDraftChecks()]);
     await renderAllProducts();
   }catch(err){
     console.error(err);
@@ -4804,8 +4952,9 @@ async function runStats(){
 
   const st = (id,val)=>{ const el=document.getElementById(id); if(el) el.textContent = String(val); };
   st("stTotal", total);
-  st("stOk", ok);
-  st("stOut", out);
+  const okRate = total > 0 ? ((ok/total)*100).toFixed(1) : "—";
+  st("stOk", total > 0 ? `${ok} (${okRate}%)` : "0");
+  st("stOut", total > 0 && out > 0 ? `${out} (${((out/total)*100).toFixed(1)}%)` : out);
   st("stCorrected", corrected);
   st("stUniqueCodes", uniqueCodes);
   st("stPerDay", perDay.toFixed(2));
@@ -4891,6 +5040,12 @@ window.addEventListener("resize", ()=> {
 });
 
 async function renderAllProducts(){
+  // Show loading state
+  const cards = document.getElementById("allProductsCards");
+  const body = document.getElementById("allProductsBody");
+  if(cards) cards.innerHTML = '<div class="muted">Caricamento prodotti…</div>';
+  if(body){ body.innerHTML = ""; }
+
   const rows = await buildAllProductsRows();
   window.__allProductsCache = rows;
 
@@ -4899,8 +5054,8 @@ async function renderAllProducts(){
   if(s && !s.__bound){
     s.__bound = true;
     s.addEventListener("input", ()=>{
-      clearTimeout(window.__allProductsSearchT);
-      window.__allProductsSearchT = setTimeout(applyAllProductsUI, 120);
+      clearTimeout(s.__debounce);
+      s.__debounce = setTimeout(applyAllProductsUI, 120);
     });
   }
   if(v && !v.__bound){
