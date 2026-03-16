@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Registro Controlli (Cloud)</title>
+  <title>Registro Controlli VivColor</title>
   <link rel="icon" href="data:,">
   <style>
     *{ box-sizing:border-box; }
@@ -27,7 +27,10 @@
     body{
       margin:0;
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-      background:var(--bg);
+      background:
+        radial-gradient(circle at top left, rgba(14,165,233,.08), transparent 28%),
+        radial-gradient(circle at top right, rgba(17,24,39,.06), transparent 24%),
+        var(--bg);
       color:var(--t);
     }
     header{
@@ -310,6 +313,16 @@
 .suggest .code{ font-weight:700; }
 .suggest .name{ color:#6b7280; font-size:.9em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+
+button{ transition:transform .14s ease, box-shadow .14s ease, background-color .14s ease, border-color .14s ease; }
+button:hover:not(:disabled){ transform:translateY(-1px); box-shadow:0 8px 18px rgba(15,23,42,.08); }
+button.primary:hover:not(:disabled){ box-shadow:0 10px 22px rgba(17,24,39,.16); }
+input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease, background-color .14s ease; }
+.controlCard, .prodCard, .card .box{ transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
+.controlCard:hover, .prodCard:hover{ box-shadow:0 10px 24px rgba(15,23,42,.07); border-color:#d8dee8; }
+#viewHome .controlCard{ background:linear-gradient(180deg,#fff 0%, #fcfdff 100%); }
+.title{ letter-spacing:.1px; }
+
 </style>
 </head>
 
@@ -319,8 +332,8 @@
     <div class="brand">
       <img class="brandlogo" src="assets/logo_vivcolor.png" alt="VivColor" />
       <div>
-        <h1>Registro Controlli (Cloud)</h1>
-        <div class="sub">Dati salvati nel cloud (Firestore). Versione prototipo.</div>
+        <h1>Registro Controlli VivColor</h1>
+        <div class="sub">Registro controlli cloud per laboratorio VivColor.</div>
       </div>
     </div>
     <div class="muted" id="dbStatus">DB: pronto</div>
@@ -334,8 +347,8 @@
     <div class="card">
       <div class="topline">
         <div>
-          <div class="muted">Apri scheda prodotto</div>
-          <div class="title">Ricerca codice</div>
+          <div class="muted">Accesso rapido</div>
+          <div class="title">Apri prodotto</div>
         </div>
       </div>
 
@@ -344,25 +357,25 @@
       <div id="codeSuggest" class="suggest"></div>
 
       <div class="btns">
-        <button class="primary" id="openBtn">Apri</button>
-        <button id="homeBtn">Home</button>
-        <button class="secondary" id="allProductsBtn">Tutti i prodotti</button>
-        <button class="secondary" id="statsBtn">Statistiche</button>
+        <button class="primary" id="openBtn">Apri scheda</button>
+        <button id="homeBtn">Dashboard</button>
+        <button class="secondary" id="allProductsBtn">Archivio prodotti</button>
+        <button class="secondary" id="statsBtn">Report</button>
       </div>
 
       <div class="hr"></div>
 
       <div class="topline">
-        <b>Backup totale</b>
+        <b>Backup completo</b>
         <span class="tag">Consigliato</span>
       </div>
       <div class="muted">Backup JSON completo per sicurezza.</div>
 
       <div class="btns">
-<button id="backupJsonBtn">Backup (JSON)</button>
+<button id="backupJsonBtn">Esporta backup JSON</button>
         <label style="margin:0">
           <input type="file" id="restoreJsonFile" accept=".json" style="display:none" />
-          <button id="restoreJsonBtn">Ripristina (JSON)</button>
+          <button id="restoreJsonBtn">Ripristina backup JSON</button>
         </label>
       </div>
 
@@ -374,11 +387,11 @@
       </div>
 
       <div class="btns">
-        <button class="danger" id="wipeBtn">Svuota database cloud</button>
+        <button class="danger" id="wipeBtn">Reset database cloud</button>
       </div>
 
       <div class="btns">
-        <button id="operatorsBtn" class="secondary">Gestione operatori</button>
+        <button id="operatorsBtn" class="secondary">Operatori</button>
       </div>
 
       <div class="kpi">
@@ -394,44 +407,41 @@
       <div id="viewHome">
         <div class="topline">
           <div>
-            <div class="muted">Start</div>
+            <div class="muted">Panoramica operativa</div>
             <div class="title">Home</div>
           </div>
         </div>
-        <div class="muted" style="margin-top:10px; line-height:1.5;">
-          Scrivi un codice e premi <b>Apri</b>. Se registri un lotto già usato, il sistema ti chiede conferma.
-        </div>
+        <div class="muted" style="margin-top:10px; line-height:1.5;">Scrivi un codice prodotto per aprire la scheda, creare un nuovo articolo o riprendere rapidamente il lavoro in corso.</div>
 
-        <!-- MOVED HERE -->
         <div class="hr"></div>
 
         <div class="topline">
           <div>
-            <div class="muted">Panoramica</div>
+            <div class="muted">Riprendi lavoro</div>
+            <div class="title">Bozze in sospeso</div>
+          </div>
+          <span class="tag">Priorità</span>
+        </div>
+
+        <div class="muted">Controlli salvati in bozza, pronti da completare senza rifare la compilazione.</div>
+
+        <div id="homeDraftChecks" style="margin-top:12px"></div>
+
+        <div class="hr"></div>
+
+        <div class="topline">
+          <div>
+            <div class="muted">Panoramica recente</div>
             <div class="title">Ultimi 5 prodotti controllati</div>
           </div>
           <span class="tag">Rapido</span>
         </div>
 
         <div class="muted">
-          Lotto e firma dell’ultimo controllo. Clicca per aprire la scheda prodotto.
+          Ultimo lotto e ultimo operatore qualità per riaprire in un attimo la scheda prodotto.
         </div>
 
         <div id="homeRecentProducts" style="margin-top:12px"></div>
-
-        <div class="hr"></div>
-
-        <div class="topline">
-          <div>
-            <div class="muted">Riprendi</div>
-            <div class="title">Bozze in sospeso</div>
-          </div>
-          <span class="tag">Evidente</span>
-        </div>
-
-        <div class="muted">Controlli salvati in bozza, pronti da completare.</div>
-
-        <div id="homeDraftChecks" style="margin-top:12px"></div>
       </div>
 
       <!-- ALL PRODUCTS -->
@@ -439,10 +449,10 @@
         <div class="topline">
           <div>
             <div class="muted">Elenco</div>
-            <div class="title">Tutti i prodotti</div>
+            <div class="title">Archivio prodotti</div>
           </div>
           <div class="btns" style="margin-top:0">
-            <button id="backFromAllProductsBtn">Home</button>
+            <button id="backFromAllProductsBtn">Dashboard</button>
           </div>
         </div>
 
@@ -459,7 +469,7 @@
 
         <div class="row2" style="margin-top:10px;">
           <div>
-            <label style="margin-top:0">Cerca per codice / nome / lotto / operatore</label>
+            <label style="margin-top:0">Ricerca per codice, nome, lotto o operatore</label>
             <input id="allProductsSearch" placeholder="Scrivi per filtrare..." autocomplete="off" />
           </div>
           <div>
@@ -477,7 +487,7 @@
         <div class="topline">
           <div>
             <div class="muted">Elenco</div>
-            <div class="title">Prodotti</div>
+            <div class="title">Elenco prodotti</div>
           </div>
           <span class="tag">Rapido</span>
         </div>
@@ -507,14 +517,14 @@
       <div id="viewProduct" class="hide">
         <div class="topline">
           <div>
-            <div class="muted">Scheda prodotto</div>
+            <div class="muted">Dettaglio prodotto</div>
             <div class="title" id="prodTitle">—</div>
             <div class="muted" id="prodMeta">—</div>
           </div>
           <div class="btns" style="margin-top:0">
-            <button id="editSetupBtn">Setup controlli</button>
+            <button id="editSetupBtn">Configura controlli</button>
             <button class="primary" id="newCheckBtn">Nuovo controllo</button>
-            <button id="historyBtn">Storico</button>
+            <button id="historyBtn">Storico controlli</button>
 </div>
         </div>
 
@@ -571,10 +581,10 @@
   <div class="topline">
     <div>
       <div class="muted">Dashboard</div>
-      <div class="title">Statistiche</div>
+      <div class="title">Report controlli</div>
     </div>
     <div class="btns" style="margin-top:0">
-      <button id="statsBackBtn">Home</button>
+      <button id="statsBackBtn">Dashboard</button>
     </div>
   </div>
 
@@ -939,7 +949,7 @@
             <div class="title">Gestione operatori</div>
           </div>
           <div class="btns" style="margin-top:0">
-            <button id="operatorsBackBtn">Home</button>
+            <button id="operatorsBackBtn">Dashboard</button>
           </div>
         </div>
 
@@ -2132,7 +2142,7 @@ async function renderHomeDraftChecks(){
         <div>
           <div style="font-weight:950">${esc(d.code || "—")} — ${esc(d.name || "")}</div>
           <div class="muted">Ultima modifica: ${esc(fmtDateTime(d.updatedAtISO || d.createdAtISO || d.dateISO || ""))}</div>
-          <div class="muted">Lotto: <span class="mono">${esc(d.lotto || "—")}</span> • Esito stimato: ${esc((d.outcome||"BOZZA").replaceAll("_"," "))}${d.corretto ? ' • <span class="tag" title="Formula corretta tramite aggiunte">Corretto</span>' : ''}</div>
+          <div class="muted">Lotto: <span class="mono">${esc(d.lotto || "—")}</span> • Stato: ${esc((d.outcome||"BOZZA").replaceAll("_"," "))}${d.corretto ? ' • <span class="tag" title="Formula corretta tramite aggiunte">Corretto</span>' : ''}</div>
         </div>
         <div class="btns" style="margin-top:0">
           <button class="smallbtn secondary" data-draft-open="${esc(d.id)}">Riprendi</button>
@@ -2158,9 +2168,9 @@ async function renderHomeDraftChecks(){
 
 async function renderHomeRecentProducts(){
   const box = document.getElementById("homeRecentProducts");
-  box.innerHTML = "";
+  if(!box) return;
+  box.innerHTML = '<div class="muted">Caricamento…</div>';
 
-  // prendo ultimi controlli (limitati), poi estraggo max 5 codici unici
   let recentChecks = [];
   try{
     const qy = query(collection(fs, COL_CHECKS), orderBy("dateISO","desc"), limit(30));
@@ -2175,33 +2185,39 @@ async function renderHomeRecentProducts(){
   }
 
   const seen = new Set();
-  const rows = [];
+  const picked = [];
   for(const c of recentChecks){
-    if(!c?.code) continue;
-    if(seen.has(c.code)) continue;
+    if(!c?.code || seen.has(c.code)) continue;
     seen.add(c.code);
-
-    let p = null;
-    try{
-      const ps = await getDoc(doc(fs, COL_PRODUCTS, c.code));
-      p = ps.exists() ? ps.data() : null;
-    }catch(_){}
-
-    rows.push({
-      code: c.code,
-      name: p?.name ?? "",
-      dateISO: c.dateISO,
-      lotto: c.lotto ?? "",
-      by: c.meta?.effettuatoDa ?? ""
-    });
-    if(rows.length>=5) break;
+    picked.push(c);
+    if(picked.length>=5) break;
   }
+
+  const codeSet = [...new Set(picked.map(x=>x.code).filter(Boolean))];
+  const productNameMap = new Map();
+  try{
+    const docs = await Promise.all(codeSet.map(code=> getDoc(doc(fs, COL_PRODUCTS, code)).catch(()=>null)));
+    docs.forEach((snap, idx)=>{
+      if(snap?.exists()) productNameMap.set(codeSet[idx], snap.data()?.name || "");
+    });
+  }catch(err){
+    console.warn("renderHomeRecentProducts product preload failed:", err);
+  }
+
+  const rows = picked.map(c=>({
+    code: c.code,
+    name: productNameMap.get(c.code) || "",
+    dateISO: c.dateISO,
+    lotto: c.lotto ?? "",
+    by: c.meta?.effettuatoDa ?? ""
+  }));
 
   if(rows.length===0){
     box.innerHTML = `<div class="muted">Nessun controllo registrato.</div>`;
     return;
   }
 
+  box.innerHTML = "";
   for(const r of rows){
     const card = document.createElement("div");
     card.className = "controlCard";
@@ -2235,7 +2251,7 @@ function renderAllProductsTable
 
   if(list.length===0){
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="8" class="muted">Nessun prodotto trovato.</td>`;
+    tr.innerHTML = `<td colspan="8" class="muted">Nessun prodotto trovato con i filtri attuali.</td>`;
     body.appendChild(tr);
     return;
   }
@@ -4567,11 +4583,14 @@ function renderOperatorPickers(){
 ========================= */
 (async function init(){
   try{
-    // Quick sanity check
     document.getElementById("dbStatus").textContent = "DB: connesso";
     showView("home");
-    await refreshKPIs();
-    await renderHomeRecentProducts();
+    await Promise.all([
+      refreshKPIs(),
+      renderHomeRecentProducts(),
+      renderHomeDraftChecks(),
+      syncOperatorsFromCloud().catch(err=>console.warn("Sync operatori non disponibile:", err))
+    ]);
   }catch(err){
     document.getElementById("dbStatus").textContent = "DB: ERRORE";
     alert("Errore DB: " + err.message);
@@ -4879,7 +4898,10 @@ async function renderAllProducts(){
   const v = document.getElementById("allProductsViewMode");
   if(s && !s.__bound){
     s.__bound = true;
-    s.addEventListener("input", applyAllProductsUI);
+    s.addEventListener("input", ()=>{
+      clearTimeout(window.__allProductsSearchT);
+      window.__allProductsSearchT = setTimeout(applyAllProductsUI, 120);
+    });
   }
   if(v && !v.__bound){
     v.__bound = true;
