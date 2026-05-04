@@ -4596,8 +4596,8 @@ function renderOperatorPickers(){
     renderBtns(qcWrap, qc, qcInput?.value, (v)=>{ if(qcInput) qcInput.value = v; renderOperatorPickers(); });
   };
 
-  prodInput?.addEventListener("input", refresh, { passive:true });
-  qcInput?.addEventListener("input", refresh, { passive:true });
+  if(prodInput) prodInput.oninput = refresh;
+  if(qcInput) qcInput.oninput = refresh;
 
   refresh();
 }
