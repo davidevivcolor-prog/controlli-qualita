@@ -3116,24 +3116,33 @@ async function saveCheck(){
       let attachmentUrl = null;
       let attachmentPath = null;
       let attachmentBytes = null;
+      let attachmentB64 = null;
       if(c.key==="deltae" || c.key==="resa"){
         const fInp = document.querySelector(`#checkRows input[type="file"][data-file="${CSS.escape(c.key)}"]`);
         const file = fInp?.files?.[0] || null;
         if(file){
+          attachmentName = file.name || "allegato.pdf";
+          attachmentBytes = file.size || null;
           try{
             const up = await uploadAttachmentToStorage({ checkId, key: c.key, file });
-            attachmentName = up?.attachmentName ?? (file.name || "allegato.pdf");
+            attachmentName = up?.attachmentName ?? attachmentName;
             attachmentUrl = up?.attachmentUrl ?? null;
             attachmentPath = up?.attachmentPath ?? null;
-            attachmentBytes = up?.attachmentBytes ?? null;
+            attachmentBytes = up?.attachmentBytes ?? attachmentBytes;
           }catch(err){
             console.error(err);
-            alert("Errore caricamento PDF allegato (prova a rinominare/ricomprimere il file): " + (err?.message || err));
+            try{
+              attachmentB64 = await fileToBase64(file);
+              console.warn(`Upload storage fallito per ${c.key}, allegato salvato inline (base64).`);
+            }catch(encErr){
+              console.error(encErr);
+              alert("Errore allegato PDF: impossibile salvare il file. Prova a rinominare/ricomprimere il file.");
+            }
           }
         }
       }
 
-      results.push({ key:c.key, name:c.name, value:v, unit:c.unit ?? "", ok, specText: specText(c), attachmentName, attachmentUrl, attachmentPath, attachmentBytes });
+      results.push({ key:c.key, name:c.name, value:v, unit:c.unit ?? "", ok, specText: specText(c), attachmentName, attachmentUrl, attachmentPath, attachmentBytes, attachmentB64 });
     }
 
     const missingMeta = [];
