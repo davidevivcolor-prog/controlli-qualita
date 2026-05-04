@@ -1262,12 +1262,27 @@ function tx(storeNames, mode="readonly"){
 }
 
 async function put(store, value){
+  const toFirestoreSafe = (input) => {
+    if(input === undefined) return null;
+    if(input === null) return null;
+    if(Array.isArray(input)) return input.map(toFirestoreSafe);
+    if(typeof input === "number") return Number.isFinite(input) ? input : null;
+    if(typeof input === "object"){
+      const out = {};
+      for(const [k,v] of Object.entries(input)){
+        out[k] = toFirestoreSafe(v);
+      }
+      return out;
+    }
+    return input;
+  };
+  const safeValue = toFirestoreSafe(value);
   if(store.__name === STORES.products){
-    await setDoc(doc(fs, COL_PRODUCTS, value.code), value);
+    await setDoc(doc(fs, COL_PRODUCTS, safeValue.code), safeValue);
     return true;
   }
   if(store.__name === STORES.checks){
-    await setDoc(doc(fs, COL_CHECKS, value.id), value);
+    await setDoc(doc(fs, COL_CHECKS, safeValue.id), safeValue);
     return true;
   }
   throw new Error("Store non valido: " + store.__name);
@@ -3116,24 +3131,33 @@ async function saveCheck(){
       let attachmentUrl = null;
       let attachmentPath = null;
       let attachmentBytes = null;
+      let attachmentB64 = null;
       if(c.key==="deltae" || c.key==="resa"){
         const fInp = document.querySelector(`#checkRows input[type="file"][data-file="${CSS.escape(c.key)}"]`);
         const file = fInp?.files?.[0] || null;
         if(file){
+          attachmentName = file.name || "allegato.pdf";
+          attachmentBytes = file.size || null;
           try{
             const up = await uploadAttachmentToStorage({ checkId, key: c.key, file });
-            attachmentName = up?.attachmentName ?? (file.name || "allegato.pdf");
+            attachmentName = up?.attachmentName ?? attachmentName;
             attachmentUrl = up?.attachmentUrl ?? null;
             attachmentPath = up?.attachmentPath ?? null;
-            attachmentBytes = up?.attachmentBytes ?? null;
+            attachmentBytes = up?.attachmentBytes ?? attachmentBytes;
           }catch(err){
             console.error(err);
-            alert("Errore caricamento PDF allegato (prova a rinominare/ricomprimere il file): " + (err?.message || err));
+            try{
+              attachmentB64 = await fileToBase64(file);
+              console.warn(`Upload storage fallito per ${c.key}, allegato salvato inline (base64).`);
+            }catch(encErr){
+              console.error(encErr);
+              alert("Errore allegato PDF: impossibile salvare il file. Prova a rinominare/ricomprimere il file.");
+            }
           }
         }
       }
 
-      results.push({ key:c.key, name:c.name, value:v, unit:c.unit ?? "", ok, specText: specText(c), attachmentName, attachmentUrl, attachmentPath, attachmentBytes });
+      results.push({ key:c.key, name:c.name, value:v, unit:c.unit ?? "", ok, specText: specText(c), attachmentName, attachmentUrl, attachmentPath, attachmentBytes, attachmentB64 });
     }
 
     const missingMeta = [];
@@ -3163,14 +3187,14 @@ async function saveCheck(){
     const resultsSan = (results||[]).map(r=>({
       key: String(r.key||""),
       name: String(r.name||""),
-      value: (r.value===null ? null : Number(r.value)),
+      value: (r.value==null || !Number.isFinite(Number(r.value)) ? null : Number(r.value)),
       unit: String(r.unit||""),
       ok: !!r.ok,
       specText: String(r.specText||""),
       attachmentName: (r.attachmentName ? String(r.attachmentName) : null),
       attachmentUrl: (r.attachmentUrl ? String(r.attachmentUrl) : null),
       attachmentPath: (r.attachmentPath ? String(r.attachmentPath) : null),
-      attachmentBytes: (r.attachmentBytes==null ? null : Number(r.attachmentBytes)),
+      attachmentBytes: (r.attachmentBytes==null || !Number.isFinite(Number(r.attachmentBytes)) ? null : Number(r.attachmentBytes)),
       attachmentB64: (r.attachmentB64 ? String(r.attachmentB64) : null)
     }));
 
