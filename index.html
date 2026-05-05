@@ -1220,7 +1220,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyA9C__WCy6O0MXFcAvsZE9ffrlgL-LwS6E",
   authDomain: "controlli-qualita.firebaseapp.com",
   projectId: "controlli-qualita",
-  storageBucket: "controlli-qualita.appspot.com",
+  storageBucket: "controlli-qualita.firebasestorage.app",
   messagingSenderId: "1051668384383",
   appId: "1:1051668384383:web:bfaf1d99f9c9b7f8c74d4a",
   measurementId: "G-B40QTFGQFH"
@@ -1233,7 +1233,7 @@ initializeAppCheck(app, {
   isTokenAutoRefreshEnabled: true
 });
 const fs = getFirestore(app);
-const storage = getStorage(app);
+const storage = getStorage(app, "gs://controlli-qualita.firebasestorage.app");
 let storageUploadEnabled = true;
 let storageUploadWarned = false;
 
