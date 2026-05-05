@@ -1234,6 +1234,7 @@ initializeAppCheck(app, {
 });
 const fs = getFirestore(app);
 const storage = getStorage(app, "gs://controlli-qualita.firebasestorage.app");
+console.log("STORAGE_BUCKET_ACTIVE_MARKER_2026_05_05", firebaseConfig.storageBucket);
 let storageUploadEnabled = true;
 let storageUploadWarned = false;
 
