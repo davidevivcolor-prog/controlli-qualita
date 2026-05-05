@@ -1220,7 +1220,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyA9C__WCy6O0MXFcAvsZE9ffrlgL-LwS6E",
   authDomain: "controlli-qualita.firebaseapp.com",
   projectId: "controlli-qualita",
-  storageBucket: "controlli-qualita.firebasestorage.app",
+  storageBucket: "controlli-qualita.appspot.com",
   messagingSenderId: "1051668384383",
   appId: "1:1051668384383:web:bfaf1d99f9c9b7f8c74d4a",
   measurementId: "G-B40QTFGQFH"
@@ -1269,18 +1269,30 @@ function tx(storeNames, mode="readonly"){
 
 async function put(store, value){
   const toFirestoreSafe = (input) => {
-    if(input === undefined) return null;
-    if(input === null) return null;
-    if(Array.isArray(input)) return input.map(toFirestoreSafe);
+    if(input === undefined || input === null) return null;
     if(typeof input === "number") return Number.isFinite(input) ? input : null;
+    if(typeof input === "string" || typeof input === "boolean") return input;
+    if(input instanceof Date) return Number.isNaN(input.getTime()) ? null : input.toISOString();
+
+    if(Array.isArray(input)){
+      return input.map(toFirestoreSafe).map(v => (v === undefined ? null : v));
+    }
+
     if(typeof input === "object"){
+      // Evita di inviare a Firestore entità non serializzabili (File/Blob/TypedArray/istanze custom).
+      if(input instanceof Blob) return null;
+      if(ArrayBuffer.isView(input) || input instanceof ArrayBuffer) return null;
+      const proto = Object.getPrototypeOf(input);
+      if(proto !== Object.prototype && proto !== null) return null;
+
       const out = {};
       for(const [k,v] of Object.entries(input)){
         out[k] = toFirestoreSafe(v);
       }
       return out;
     }
-    return input;
+
+    return null;
   };
   const safeValue = toFirestoreSafe(value);
   if(store.__name === STORES.products){
