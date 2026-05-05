@@ -1260,6 +1260,7 @@ let workingControlsEdit = null;
 let detailCheck = null;
 let detailOriginal = null;
 let lastReturnView = 'home';
+const pendingDetailFiles = new Map();
 
 // Compat layer (keeps most of your code unchanged)
 function tx(storeNames, mode="readonly"){
@@ -1269,34 +1270,141 @@ function tx(storeNames, mode="readonly"){
   };
 }
 
-async function put(store, value){
-  const toFirestoreSafe = (input) => {
-    if(input === undefined || input === null) return null;
-    if(typeof input === "number") return Number.isFinite(input) ? input : null;
-    if(typeof input === "string" || typeof input === "boolean") return input;
-    if(input instanceof Date) return Number.isNaN(input.getTime()) ? null : input.toISOString();
+function sanitizePrimitiveForFirestore(input){
+  if(input === undefined || input === null) return null;
+  if(typeof input === "number") return Number.isFinite(input) ? input : null;
+  if(typeof input === "string" || typeof input === "boolean") return input;
+  if(input instanceof Date) return Number.isNaN(input.getTime()) ? null : input.toISOString();
+  if(input instanceof Blob) return null;
+  if(ArrayBuffer.isView(input) || input instanceof ArrayBuffer) return null;
+  if(typeof File !== "undefined" && input instanceof File) return null;
+  if(typeof FileList !== "undefined" && input instanceof FileList) return null;
+  return null;
+}
 
-    if(Array.isArray(input)){
-      return input.map(toFirestoreSafe).map(v => (v === undefined ? null : v));
-    }
+function toFirestoreSafe(input){
+  const primitive = sanitizePrimitiveForFirestore(input);
+  if(
+    primitive !== null ||
+    input === null ||
+    input === undefined ||
+    typeof input === "number" ||
+    typeof input === "string" ||
+    typeof input === "boolean" ||
+    input instanceof Date ||
+    input instanceof Blob ||
+    ArrayBuffer.isView(input) ||
+    input instanceof ArrayBuffer ||
+    (typeof File !== "undefined" && input instanceof File) ||
+    (typeof FileList !== "undefined" && input instanceof FileList)
+  ){
+    return primitive;
+  }
 
-    if(typeof input === "object"){
-      // Evita di inviare a Firestore entità non serializzabili (File/Blob/TypedArray/istanze custom).
-      if(input instanceof Blob) return null;
-      if(ArrayBuffer.isView(input) || input instanceof ArrayBuffer) return null;
-      const proto = Object.getPrototypeOf(input);
-      if(proto !== Object.prototype && proto !== null) return null;
-
-      const out = {};
-      for(const [k,v] of Object.entries(input)){
-        out[k] = toFirestoreSafe(v);
+  if(Array.isArray(input)){
+    const out = [];
+    for(const item of input){
+      const safeItem = toFirestoreSafe(item);
+      if(Array.isArray(safeItem)){
+        for(const nested of safeItem){
+          out.push(nested === undefined ? null : nested);
+        }
+      }else{
+        out.push(safeItem === undefined ? null : safeItem);
       }
-      return out;
     }
+    return out;
+  }
 
-    return null;
+  if(typeof input === "object"){
+    const proto = Object.getPrototypeOf(input);
+    if(proto !== Object.prototype && proto !== null) return null;
+    const out = {};
+    for(const [k, v] of Object.entries(input)){
+      out[k] = toFirestoreSafe(v);
+    }
+    return out;
+  }
+
+  return null;
+}
+
+function sanitizeCheckMeta(meta){
+  return {
+    viscositaNote: String(meta?.viscositaNote || ""),
+    aggiunte: String(meta?.aggiunte || ""),
+    note: String(meta?.note || ""),
+    prodottoDa: String(meta?.prodottoDa || ""),
+    effettuatoDa: String(meta?.effettuatoDa || "")
   };
-  const safeValue = toFirestoreSafe(value);
+}
+
+function sanitizeCheckResults(results){
+  return (Array.isArray(results) ? results : []).map(r => ({
+    key: String(r?.key || ""),
+    name: String(r?.name || ""),
+    value: (r?.value == null || !Number.isFinite(Number(r.value)) ? null : Number(r.value)),
+    unit: String(r?.unit || ""),
+    ok: (r?.ok === true ? true : (r?.ok === false ? false : null)),
+    specText: String(r?.specText || ""),
+    attachmentName: (r?.attachmentName ? String(r.attachmentName) : null),
+    attachmentUrl: (r?.attachmentUrl ? String(r.attachmentUrl) : null),
+    attachmentPath: (r?.attachmentPath ? String(r.attachmentPath) : null),
+    attachmentBytes: (r?.attachmentBytes == null || !Number.isFinite(Number(r.attachmentBytes)) ? null : Number(r.attachmentBytes)),
+    attachmentB64: (r?.attachmentB64 ? String(r.attachmentB64) : null)
+  }));
+}
+
+function sanitizeModifications(mods){
+  const entries = Object.entries(mods || {});
+  const out = {};
+  for(const [k, arr] of entries){
+    out[String(k)] = (Array.isArray(arr) ? arr : []).map(m => ({
+      at: String(m?.at || ""),
+      old: (m?.old == null || !Number.isFinite(Number(m.old)) ? null : Number(m.old)),
+      new: (m?.new == null || !Number.isFinite(Number(m.new)) ? null : Number(m.new))
+    }));
+  }
+  return out;
+}
+
+function sanitizeCheckDocument(check){
+  return toFirestoreSafe({
+    id: String(check?.id || ""),
+    code: String(check?.code || ""),
+    dateISO: String(check?.dateISO || ""),
+    lotto: String(check?.lotto || ""),
+    outcome: String(check?.outcome || ""),
+    corretto: !!check?.corretto,
+    results: sanitizeCheckResults(check?.results),
+    meta: sanitizeCheckMeta(check?.meta),
+    modifications: sanitizeModifications(check?.modifications)
+  });
+}
+
+function sanitizeDraftDocument(draft){
+  return toFirestoreSafe({
+    id: String(draft?.id || ""),
+    status: "draft",
+    code: String(draft?.code || ""),
+    name: String(draft?.name || ""),
+    dateISO: String(draft?.dateISO || ""),
+    lotto: String(draft?.lotto || ""),
+    outcome: String(draft?.outcome || ""),
+    corretto: !!draft?.corretto,
+    results: sanitizeCheckResults(draft?.results),
+    meta: sanitizeCheckMeta(draft?.meta),
+    createdAtISO: String(draft?.createdAtISO || ""),
+    updatedAtISO: String(draft?.updatedAtISO || "")
+  });
+}
+
+async function put(store, value){
+  const safeValue = (
+    store.__name === STORES.checks
+      ? sanitizeCheckDocument(value)
+      : toFirestoreSafe(value)
+  );
   if(store.__name === STORES.products){
     await setDoc(doc(fs, COL_PRODUCTS, safeValue.code), safeValue);
     return true;
@@ -3004,6 +3112,7 @@ async function startNewCheck(draft=null){
 
   currentDraftId = draft?.id || null;
   setDraftUiState(!!currentDraftId);
+  pendingDetailFiles.clear();
   renderOperatorPickers();
   showView("newCheck");
 }
@@ -3066,7 +3175,7 @@ async function saveCheckDraft(options={}){
     }
     if(!createdAtISO) createdAtISO = new Date().toISOString();
 
-    const payload = {
+    const payload = sanitizeDraftDocument({
       id: draftId,
       status: "draft",
       code: state.code,
@@ -3079,7 +3188,7 @@ async function saveCheckDraft(options={}){
       meta: state.meta,
       createdAtISO,
       updatedAtISO: new Date().toISOString()
-    };
+    });
 
     upsertDraftLocal(payload);
 
@@ -3284,19 +3393,7 @@ async function saveCheck(){
 
     const corretto = !!(meta.aggiunte && meta.aggiunte.trim().length>0);
 
-    const resultsSan = (results||[]).map(r=>({
-      key: String(r.key||""),
-      name: String(r.name||""),
-      value: (r.value==null || !Number.isFinite(Number(r.value)) ? null : Number(r.value)),
-      unit: String(r.unit||""),
-      ok: !!r.ok,
-      specText: String(r.specText||""),
-      attachmentName: (r.attachmentName ? String(r.attachmentName) : null),
-      attachmentUrl: (r.attachmentUrl ? String(r.attachmentUrl) : null),
-      attachmentPath: (r.attachmentPath ? String(r.attachmentPath) : null),
-      attachmentBytes: (r.attachmentBytes==null || !Number.isFinite(Number(r.attachmentBytes)) ? null : Number(r.attachmentBytes)),
-      attachmentB64: (r.attachmentB64 ? String(r.attachmentB64) : null)
-    }));
+    const resultsSan = sanitizeCheckResults(results);
 
     const check = {
       id: checkId,
@@ -3642,11 +3739,18 @@ async function openCheckDetailPage(checkId){
       if(fEl){
         fEl.onchange = async () => {
           const file = fEl.files?.[0] || null;
-          if(!file) return;
+          if(!file){
+            pendingDetailFiles.delete(ctrl.key);
+            return;
+          }
+          pendingDetailFiles.set(ctrl.key, file);
           r.attachmentName = file.name || "allegato.pdf";
-          r.attachmentB64 = await fileToBase64(file);
+          r.attachmentBytes = file.size || null;
+          r.attachmentUrl = null;
+          r.attachmentPath = null;
+          r.attachmentB64 = null;
           const dlBtn = card.querySelector(`button[data-attdl="${CSS.escape(ctrl.key)}"]`);
-          if(dlBtn) dlBtn.disabled = !r.attachmentB64;
+          if(dlBtn) dlBtn.disabled = false;
           updateDetailTitle();
         };
       }
@@ -3675,6 +3779,19 @@ async function openCheckDetailPage(checkId){
       const attBtn = card.querySelector(`button[data-attdl="${CSS.escape(ctrl.key)}"]`);
       if(attBtn){
         attBtn.onclick = async () => {
+          const pendingFile = pendingDetailFiles.get(ctrl.key);
+          if(pendingFile){
+            const bytes = new Uint8Array(await pendingFile.arrayBuffer());
+            const filename = (pendingFile.name || r.attachmentName || "allegato.pdf");
+            downloadBytes(filename, bytes, "application/pdf");
+            return;
+          }
+          if(r.attachmentUrl){
+            const bytes = await fetchBytesFromUrl(r.attachmentUrl);
+            const filename = (r.attachmentName || "allegato.pdf");
+            downloadBytes(filename, bytes, "application/pdf");
+            return;
+          }
           if(!r.attachmentB64) return;
           const bytes = base64ToUint8Array(r.attachmentB64);
           const filename = (r.attachmentName || "allegato.pdf");
@@ -3713,6 +3830,7 @@ async function openCheckDetailPage(checkId){
     setStar(vn, false);
   }
 
+  pendingDetailFiles.clear();
   updateDetailTitle();
   showView("detail");
 }
@@ -3822,54 +3940,46 @@ async function saveDetail(){
     }
   }
 
+  for(const r of (detailCheck.results||[])){
+    const pendingFile = pendingDetailFiles.get(r.key);
+    if(!pendingFile) continue;
+
+    r.attachmentName = pendingFile.name || "allegato.pdf";
+    r.attachmentBytes = pendingFile.size || null;
+    r.attachmentUrl = null;
+    r.attachmentPath = null;
+    r.attachmentB64 = null;
+
+    try{
+      const up = await uploadAttachmentToStorage({ checkId: detailCheck.id, key: r.key, file: pendingFile });
+      if(up){
+        r.attachmentName = up?.attachmentName ?? r.attachmentName;
+        r.attachmentUrl = up?.attachmentUrl ?? null;
+        r.attachmentPath = up?.attachmentPath ?? null;
+        r.attachmentBytes = up?.attachmentBytes ?? r.attachmentBytes;
+      }else{
+        r.attachmentB64 = await fileToBase64(pendingFile);
+      }
+    }catch(err){
+      console.error(err);
+      r.attachmentB64 = await fileToBase64(pendingFile);
+      console.warn(`Upload storage fallito per ${r.key}, allegato salvato inline (base64).`);
+    }
+  }
+
   detailCheck.outcome = (detailCheck.results||[]).some(x=>x.ok===false) ? "FUORI_STD" : "OK";
 
   // aggiorna anche il flag "corretto" in base alle aggiunte
   detailCheck.meta = detailCheck.meta || {};
   detailCheck.corretto = !!(String(detailCheck.meta.aggiunte || "").trim().length > 0);
 
-detailCheck.results = (detailCheck.results || []).map(r => ({
-  key: String(r.key || ""),
-  name: String(r.name || ""),
-  value: (r.value == null || !Number.isFinite(Number(r.value)) ? null : Number(r.value)),
-  unit: String(r.unit || ""),
-  ok: r.ok === true,
-  specText: String(r.specText || ""),
-  attachmentName: r.attachmentName ? String(r.attachmentName) : null,
-  attachmentUrl: r.attachmentUrl ? String(r.attachmentUrl) : null,
-  attachmentPath: r.attachmentPath ? String(r.attachmentPath) : null,
-  attachmentBytes: (r.attachmentBytes == null || !Number.isFinite(Number(r.attachmentBytes)) ? null : Number(r.attachmentBytes)),
-  attachmentB64: r.attachmentB64 ? String(r.attachmentB64) : null
-}));
+const detailCheckSan = sanitizeCheckDocument(detailCheck);
 
-const detailCheckSan = {
-  id: String(detailCheck.id || ""),
-  code: String(detailCheck.code || ""),
-  dateISO: String(detailCheck.dateISO || ""),
-  lotto: String(detailCheck.lotto || ""),
-  outcome: String(detailCheck.outcome || ""),
-  corretto: !!detailCheck.corretto,
-  results: detailCheck.results,
-  meta: {
-    viscositaNote: String(detailCheck.meta?.viscositaNote || ""),
-    aggiunte: String(detailCheck.meta?.aggiunte || ""),
-    note: String(detailCheck.meta?.note || ""),
-    prodottoDa: String(detailCheck.meta?.prodottoDa || ""),
-    effettuatoDa: String(detailCheck.meta?.effettuatoDa || "")
-  },
-  modifications: Object.fromEntries(Object.entries(detailCheck.modifications || {}).map(([k,arr])=>[
-    String(k),
-    (Array.isArray(arr) ? arr : []).map(m=>({
-      at: String(m?.at || ""),
-      old: (m?.old == null || !Number.isFinite(Number(m.old)) ? null : Number(m.old)),
-      new: (m?.new == null || !Number.isFinite(Number(m.new)) ? null : Number(m.new))
-    }))
-  ]))
-};
-
+const t = tx([STORES.checks], "readwrite");
 const t = tx([STORES.checks], "readwrite");
 await put(t.objectStore(STORES.checks), detailCheckSan);
 detailCheck = detailCheckSan;
+pendingDetailFiles.clear();
 
   detailOriginal = deepClone(detailCheck);
   updateDetailTitle();
