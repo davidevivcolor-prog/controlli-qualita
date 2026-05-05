@@ -3824,8 +3824,34 @@ detailCheck.results = (detailCheck.results || []).map(r => ({
   attachmentB64: r.attachmentB64 ? String(r.attachmentB64) : null
 }));
 
+const detailCheckSan = {
+  id: String(detailCheck.id || ""),
+  code: String(detailCheck.code || ""),
+  dateISO: String(detailCheck.dateISO || ""),
+  lotto: String(detailCheck.lotto || ""),
+  outcome: String(detailCheck.outcome || ""),
+  corretto: !!detailCheck.corretto,
+  results: detailCheck.results,
+  meta: {
+    viscositaNote: String(detailCheck.meta?.viscositaNote || ""),
+    aggiunte: String(detailCheck.meta?.aggiunte || ""),
+    note: String(detailCheck.meta?.note || ""),
+    prodottoDa: String(detailCheck.meta?.prodottoDa || ""),
+    effettuatoDa: String(detailCheck.meta?.effettuatoDa || "")
+  },
+  modifications: Object.fromEntries(Object.entries(detailCheck.modifications || {}).map(([k,arr])=>[
+    String(k),
+    (Array.isArray(arr) ? arr : []).map(m=>({
+      at: String(m?.at || ""),
+      old: (m?.old == null || !Number.isFinite(Number(m.old)) ? null : Number(m.old)),
+      new: (m?.new == null || !Number.isFinite(Number(m.new)) ? null : Number(m.new))
+    }))
+  ]))
+};
+
 const t = tx([STORES.checks], "readwrite");
-await put(t.objectStore(STORES.checks), detailCheck);
+await put(t.objectStore(STORES.checks), detailCheckSan);
+detailCheck = detailCheckSan;
 
   detailOriginal = deepClone(detailCheck);
   updateDetailTitle();
