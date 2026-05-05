@@ -3976,7 +3976,6 @@ async function saveDetail(){
 const detailCheckSan = sanitizeCheckDocument(detailCheck);
 
 const t = tx([STORES.checks], "readwrite");
-const t = tx([STORES.checks], "readwrite");
 await put(t.objectStore(STORES.checks), detailCheckSan);
 detailCheck = detailCheckSan;
 pendingDetailFiles.clear();
