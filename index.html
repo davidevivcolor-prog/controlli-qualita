@@ -1234,6 +1234,8 @@ initializeAppCheck(app, {
 });
 const fs = getFirestore(app);
 const storage = getStorage(app);
+let storageUploadEnabled = true;
+let storageUploadWarned = false;
 
 
 // Collections
@@ -1459,13 +1461,25 @@ function fileToBase64(file){
    Allegati PDF (Storage)
 ========================= */
 async function uploadAttachmentToStorage({ checkId, key, file }){
-  if(!file) return null;
+  if(!file || !storageUploadEnabled) return null;
   const safeName = (file.name || "allegato.pdf").replace(/[\\/]+/g,"_");
   const path = `attachments/${checkId}/${key}/${Date.now()}_${safeName}`;
   const r = storageRef(storage, path);
-  await uploadBytes(r, file, { contentType: file.type || "application/pdf" });
-  const url = await getDownloadURL(r);
-  return { attachmentName: safeName, attachmentUrl: url, attachmentPath: path, attachmentBytes: file.size || null };
+  try{
+    await uploadBytes(r, file, { contentType: file.type || "application/pdf" });
+    const url = await getDownloadURL(r);
+    return { attachmentName: safeName, attachmentUrl: url, attachmentPath: path, attachmentBytes: file.size || null };
+  }catch(err){
+    const msg = String(err?.message || err || "").toLowerCase();
+    if(msg.includes("cors") || msg.includes("xmlhttprequest") || msg.includes("network") || msg.includes("failed to fetch")){
+      storageUploadEnabled = false;
+      if(!storageUploadWarned){
+        storageUploadWarned = true;
+        alert("Upload su cloud non disponibile (CORS/rete). Salvo gli allegati nel controllo (base64) per non perdere dati.");
+      }
+    }
+    throw err;
+  }
 }
 
 async function fetchBytesFromUrl(url){
@@ -3222,10 +3236,14 @@ async function saveCheck(){
           attachmentBytes = file.size || null;
           try{
             const up = await uploadAttachmentToStorage({ checkId, key: c.key, file });
-            attachmentName = up?.attachmentName ?? attachmentName;
-            attachmentUrl = up?.attachmentUrl ?? null;
-            attachmentPath = up?.attachmentPath ?? null;
-            attachmentBytes = up?.attachmentBytes ?? attachmentBytes;
+            if(up){
+              attachmentName = up?.attachmentName ?? attachmentName;
+              attachmentUrl = up?.attachmentUrl ?? null;
+              attachmentPath = up?.attachmentPath ?? null;
+              attachmentBytes = up?.attachmentBytes ?? attachmentBytes;
+            }else{
+              attachmentB64 = await fileToBase64(file);
+            }
           }catch(err){
             console.error(err);
             try{
@@ -3824,8 +3842,34 @@ detailCheck.results = (detailCheck.results || []).map(r => ({
   attachmentB64: r.attachmentB64 ? String(r.attachmentB64) : null
 }));
 
+const detailCheckSan = {
+  id: String(detailCheck.id || ""),
+  code: String(detailCheck.code || ""),
+  dateISO: String(detailCheck.dateISO || ""),
+  lotto: String(detailCheck.lotto || ""),
+  outcome: String(detailCheck.outcome || ""),
+  corretto: !!detailCheck.corretto,
+  results: detailCheck.results,
+  meta: {
+    viscositaNote: String(detailCheck.meta?.viscositaNote || ""),
+    aggiunte: String(detailCheck.meta?.aggiunte || ""),
+    note: String(detailCheck.meta?.note || ""),
+    prodottoDa: String(detailCheck.meta?.prodottoDa || ""),
+    effettuatoDa: String(detailCheck.meta?.effettuatoDa || "")
+  },
+  modifications: Object.fromEntries(Object.entries(detailCheck.modifications || {}).map(([k,arr])=>[
+    String(k),
+    (Array.isArray(arr) ? arr : []).map(m=>({
+      at: String(m?.at || ""),
+      old: (m?.old == null || !Number.isFinite(Number(m.old)) ? null : Number(m.old)),
+      new: (m?.new == null || !Number.isFinite(Number(m.new)) ? null : Number(m.new))
+    }))
+  ]))
+};
+
 const t = tx([STORES.checks], "readwrite");
-await put(t.objectStore(STORES.checks), detailCheck);
+await put(t.objectStore(STORES.checks), detailCheckSan);
+detailCheck = detailCheckSan;
 
   detailOriginal = deepClone(detailCheck);
   updateDetailTitle();
