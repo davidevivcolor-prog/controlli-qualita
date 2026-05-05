@@ -3810,8 +3810,22 @@ async function saveDetail(){
   detailCheck.meta = detailCheck.meta || {};
   detailCheck.corretto = !!(String(detailCheck.meta.aggiunte || "").trim().length > 0);
 
-  const t = tx([STORES.checks], "readwrite");
-  await put(t.objectStore(STORES.checks), detailCheck);
+detailCheck.results = (detailCheck.results || []).map(r => ({
+  key: String(r.key || ""),
+  name: String(r.name || ""),
+  value: (r.value == null || !Number.isFinite(Number(r.value)) ? null : Number(r.value)),
+  unit: String(r.unit || ""),
+  ok: r.ok === true,
+  specText: String(r.specText || ""),
+  attachmentName: r.attachmentName ? String(r.attachmentName) : null,
+  attachmentUrl: r.attachmentUrl ? String(r.attachmentUrl) : null,
+  attachmentPath: r.attachmentPath ? String(r.attachmentPath) : null,
+  attachmentBytes: (r.attachmentBytes == null || !Number.isFinite(Number(r.attachmentBytes)) ? null : Number(r.attachmentBytes)),
+  attachmentB64: r.attachmentB64 ? String(r.attachmentB64) : null
+}));
+
+const t = tx([STORES.checks], "readwrite");
+await put(t.objectStore(STORES.checks), detailCheck);
 
   detailOriginal = deepClone(detailCheck);
   updateDetailTitle();
