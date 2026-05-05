@@ -413,6 +413,8 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
         </div>
         <div class="muted" style="margin-top:10px; line-height:1.5;">Scrivi un codice prodotto per aprire la scheda, creare un nuovo articolo o riprendere rapidamente il lavoro in corso.</div>
 
+        <div id="backupHealth" class="noteBox" style="margin-top:12px; border-style:solid;">Stato backup: caricamento…</div>
+
         <div class="hr"></div>
 
         <div class="topline">
@@ -1237,6 +1239,8 @@ const COL_PRODUCTS = "products";
 const COL_CHECKS = "checks";
 const COL_DRAFTS = "draft_checks";
 const COL_OPERATORS = "operators";
+const COL_META = "meta";
+const DOC_BACKUP_STATUS = "backup_status";
 
 // Store names (legacy-compatible)
 const STORES = { products: 'products', checks: 'checks' };
@@ -2140,6 +2144,70 @@ async function fetchDraftChecks(){
     console.warn("fetchDraftChecks cloud fallback -> local:", err);
   }
   return localDrafts;
+}
+
+function formatElapsed(ms){
+  if(ms < 0) ms = 0;
+  const m = Math.floor(ms / 60000);
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  const mm = m % 60;
+  if(d>0) return `${d}g ${h}h`;
+  if(h>0) return `${h}h ${mm}m`;
+  return `${mm}m`;
+}
+
+async function markBackupDownload(){
+  const atISO = new Date().toISOString();
+  await setDoc(doc(fs, COL_META, DOC_BACKUP_STATUS), { lastBackupDownloadISO: atISO }, { merge:true });
+}
+
+async function renderBackupHealth(){
+  const el = document.getElementById("backupHealth");
+  if(!el) return;
+  try{
+    const snap = await getDoc(doc(fs, COL_META, DOC_BACKUP_STATUS));
+    const lastISO = snap.exists() ? (snap.data()?.lastBackupDownloadISO || null) : null;
+    if(!lastISO){
+      el.style.background = "var(--kobg)";
+      el.style.borderColor = "var(--kobd)";
+      el.style.color = "var(--danger)";
+      el.innerHTML = `Stato backup: nessun download registrato.`;
+      return;
+    }
+
+    const lastTs = Date.parse(lastISO);
+    const diffMs = Date.now() - (Number.isFinite(lastTs) ? lastTs : 0);
+    const diffHours = diffMs / (1000*60*60);
+    const isCritical = diffHours >= 48;
+    const isWarning = diffHours > 10;
+
+    if(isWarning){
+      el.style.background = "var(--kobg)";
+      el.style.borderColor = "var(--kobd)";
+      el.style.color = "var(--danger)";
+    } else {
+      el.style.background = "var(--okbg)";
+      el.style.borderColor = "var(--okbd)";
+      el.style.color = "#166534";
+    }
+
+    el.innerHTML = `Ultimo backup scaricato: <b>${esc(fmtDateTime(lastISO))}</b> · ${esc(formatElapsed(diffMs))} fa.`;
+
+    if(isCritical){
+      const warnedFor = sessionStorage.getItem("backupCriticalWarnedForISO");
+      if(warnedFor !== lastISO){
+        alert("⚠️ ATTENZIONE: sono passati più di 2 giorni dall'ultimo backup scaricato. Esegui subito un nuovo backup JSON.");
+        sessionStorage.setItem("backupCriticalWarnedForISO", lastISO);
+      }
+    }
+  }catch(err){
+    el.style.background = "var(--kobg)";
+    el.style.borderColor = "var(--kobd)";
+    el.style.color = "var(--danger)";
+    el.innerHTML = `Stato backup: errore lettura dati cloud.`;
+    console.warn("renderBackupHealth failed:", err);
+  }
 }
 
 async function renderHomeDraftChecks(){
@@ -3910,6 +3978,7 @@ on("homeBtn","click",async ()=>{
   showView("home");
   await refreshKPIs();
   await renderHomeRecentProducts();
+  await renderBackupHealth();
 });
 
 on("allProductsBtn","click",async ()=>{
@@ -4076,6 +4145,8 @@ on("exportAllCsvBtn","click",async ()=>{
 on("backupJsonBtn","click",async ()=>{
   const b=await makeBackup();
   downloadText(`backup_qc_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(b,null,2));
+  try{ await markBackupDownload(); }catch(err){ console.warn("markBackupDownload failed:", err); }
+  await renderBackupHealth();
 });
 on("restoreJsonBtn","click",()=> document.getElementById("restoreJsonFile").click());
 on("restoreJsonFile","change",async (e)=>{
@@ -4613,6 +4684,7 @@ function renderOperatorPickers(){
       refreshKPIs(),
       renderHomeRecentProducts(),
       renderHomeDraftChecks(),
+      renderBackupHealth(),
       syncOperatorsFromCloud().catch(err=>console.warn("Sync operatori non disponibile:", err))
     ]);
   }catch(err){
