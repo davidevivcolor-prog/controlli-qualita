@@ -1218,7 +1218,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyA9C__WCy6O0MXFcAvsZE9ffrlgL-LwS6E",
   authDomain: "controlli-qualita.firebaseapp.com",
   projectId: "controlli-qualita",
-  storageBucket: "controlli-qualita.firebasestorage.app",
+  storageBucket: "controlli-qualita.appspot.com",
   messagingSenderId: "1051668384383",
   appId: "1:1051668384383:web:bfaf1d99f9c9b7f8c74d4a",
   measurementId: "G-B40QTFGQFH"
@@ -1265,18 +1265,30 @@ function tx(storeNames, mode="readonly"){
 
 async function put(store, value){
   const toFirestoreSafe = (input) => {
-    if(input === undefined) return null;
-    if(input === null) return null;
-    if(Array.isArray(input)) return input.map(toFirestoreSafe);
+    if(input === undefined || input === null) return null;
     if(typeof input === "number") return Number.isFinite(input) ? input : null;
+    if(typeof input === "string" || typeof input === "boolean") return input;
+    if(input instanceof Date) return Number.isNaN(input.getTime()) ? null : input.toISOString();
+
+    if(Array.isArray(input)){
+      return input.map(toFirestoreSafe).map(v => (v === undefined ? null : v));
+    }
+
     if(typeof input === "object"){
+      // Evita di inviare a Firestore entità non serializzabili (File/Blob/TypedArray/istanze custom).
+      if(input instanceof Blob) return null;
+      if(ArrayBuffer.isView(input) || input instanceof ArrayBuffer) return null;
+      const proto = Object.getPrototypeOf(input);
+      if(proto !== Object.prototype && proto !== null) return null;
+
       const out = {};
       for(const [k,v] of Object.entries(input)){
         out[k] = toFirestoreSafe(v);
       }
       return out;
     }
-    return input;
+
+    return null;
   };
   const safeValue = toFirestoreSafe(value);
   if(store.__name === STORES.products){
@@ -1466,6 +1478,55 @@ async function fetchBytesFromUrl(url){
 // Logo VivColor (inline SVG). Se vuoi sostituirlo con il logo ufficiale, basta rimpiazzare questa dataURL.
 const VIVCOLOR_LOGO_URL = "assets/logo_vivcolor.png";
 
+
+
+function normalizeCheckForSave(check){
+  const inObj = check || {};
+  const results = Array.isArray(inObj.results) ? inObj.results : [];
+  const resultsSan = results.map(r => ({
+    key: String(r?.key || ""),
+    name: String(r?.name || ""),
+    value: (r?.value==null || !Number.isFinite(Number(r.value)) ? null : Number(r.value)),
+    unit: String(r?.unit || ""),
+    ok: (r?.ok===true ? true : (r?.ok===false ? false : null)),
+    specText: String(r?.specText || ""),
+    attachmentName: (r?.attachmentName ? String(r.attachmentName) : null),
+    attachmentUrl: (r?.attachmentUrl ? String(r.attachmentUrl) : null),
+    attachmentPath: (r?.attachmentPath ? String(r.attachmentPath) : null),
+    attachmentBytes: (r?.attachmentBytes==null || !Number.isFinite(Number(r.attachmentBytes)) ? null : Number(r.attachmentBytes)),
+    attachmentB64: (r?.attachmentB64 ? String(r.attachmentB64) : null)
+  }));
+
+  const modsIn = (inObj.modifications && typeof inObj.modifications === 'object') ? inObj.modifications : {};
+  const modifications = {};
+  for(const [k,arr] of Object.entries(modsIn)){
+    if(!Array.isArray(arr)) continue;
+    modifications[k] = arr.map(m => ({
+      at: (m?.at ? String(m.at) : new Date().toISOString()),
+      old: (m?.old==null ? null : (Number.isFinite(Number(m.old)) ? Number(m.old) : String(m.old))),
+      new: (m?.new==null ? null : (Number.isFinite(Number(m.new)) ? Number(m.new) : String(m.new)))
+    }));
+  }
+
+  return {
+    ...inObj,
+    id: String(inObj.id || uuid()),
+    code: String(inObj.code || ""),
+    dateISO: String(inObj.dateISO || new Date().toISOString()),
+    lotto: String(inObj.lotto || "").trim().toUpperCase(),
+    outcome: (inObj.outcome === "FUORI_STD" ? "FUORI_STD" : "OK"),
+    corretto: !!inObj.corretto,
+    results: resultsSan,
+    meta: {
+      viscositaNote: String(inObj?.meta?.viscositaNote || ""),
+      aggiunte: String(inObj?.meta?.aggiunte || ""),
+      note: String(inObj?.meta?.note || ""),
+      prodottoDa: String(inObj?.meta?.prodottoDa || ""),
+      effettuatoDa: String(inObj?.meta?.effettuatoDa || "")
+    },
+    modifications
+  };
+}
 
 function base64ToUint8Array(b64){
   const bin = atob(b64 || "");
@@ -3729,6 +3790,8 @@ async function saveDetail(){
   // aggiorna anche il flag "corretto" in base alle aggiunte
   detailCheck.meta = detailCheck.meta || {};
   detailCheck.corretto = !!(String(detailCheck.meta.aggiunte || "").trim().length > 0);
+
+  detailCheck = normalizeCheckForSave(detailCheck);
 
   const t = tx([STORES.checks], "readwrite");
   await put(t.objectStore(STORES.checks), detailCheck);
