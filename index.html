@@ -1225,6 +1225,11 @@ const firebaseConfig = {
   appId: "1:1051668384383:web:bfaf1d99f9c9b7f8c74d4a",
   measurementId: "G-B40QTFGQFH"
 };
+const ENABLE_FIREBASE_STORAGE_UPLOAD = false;
+const FIRESTORE_BASE64_ATTACHMENT_MAX_BYTES = 650000;
+const ATTACHMENT_MODE_NOTE = ENABLE_FIREBASE_STORAGE_UPLOAD
+  ? "Modalità allegati: upload Firebase Storage attivo con fallback base64 su errore"
+  : "Modalità allegati: fallback Firestore base64 attivo (Storage disattivato da configurazione)";
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 // App Check (reCAPTCHA v3) - incolla qui la SITE KEY che ti mostra Firebase App Check
@@ -1235,7 +1240,8 @@ initializeAppCheck(app, {
 const fs = getFirestore(app);
 const storage = getStorage(app, "gs://controlli-qualita.firebasestorage.app");
 console.log("STORAGE_BUCKET_ACTIVE_MARKER_2026_05_05", firebaseConfig.storageBucket);
-let storageUploadEnabled = true;
+console.info("[ATTACHMENT]", ATTACHMENT_MODE_NOTE);
+let storageUploadEnabled = ENABLE_FIREBASE_STORAGE_UPLOAD === true;
 let storageUploadWarned = false;
 
 
@@ -1574,21 +1580,65 @@ async function uploadAttachmentToStorage({ checkId, key, file }){
   const safeName = (file.name || "allegato.pdf").replace(/[\\/]+/g,"_");
   const path = `attachments/${checkId}/${key}/${Date.now()}_${safeName}`;
   const r = storageRef(storage, path);
-  try{
-    await uploadBytes(r, file, { contentType: file.type || "application/pdf" });
-    const url = await getDownloadURL(r);
-    return { attachmentName: safeName, attachmentUrl: url, attachmentPath: path, attachmentBytes: file.size || null };
-  }catch(err){
-    const msg = String(err?.message || err || "").toLowerCase();
-    if(msg.includes("cors") || msg.includes("xmlhttprequest") || msg.includes("network") || msg.includes("failed to fetch")){
+  console.info("[ATTACHMENT] Storage upload attempt", { bucket: firebaseConfig.storageBucket, checkId, kind: key, path, bytes: file.size || null });
+  await uploadBytes(r, file, { contentType: file.type || "application/pdf" });
+  const url = await getDownloadURL(r);
+  console.info("[ATTACHMENT] Storage upload success", { checkId, kind: key, path, bytes: file.size || null });
+  return { mode:"storage", attachmentName: safeName, attachmentUrl: url, attachmentPath: path, attachmentBytes: file.size || null, attachmentB64: null };
+}
+
+function buildBase64FallbackMessage(err){
+  const em = err?.message || err?.code || String(err || "errore sconosciuto");
+  return `Storage non disponibile: possibile problema CORS, regole Storage, App Check o configurazione bucket. Allegato salvato in fallback base64. (${em})`;
+}
+
+async function preparePdfAttachment({ checkId, key, file }){
+  if(!file) return null;
+  const safeName = (file.name || "allegato.pdf").replace(/[\\/]+/g,"_");
+  const base = { attachmentName: safeName, attachmentBytes: file.size || null, attachmentUrl: null, attachmentPath: null, attachmentB64: null };
+
+  if((file.size || 0) > FIRESTORE_BASE64_ATTACHMENT_MAX_BYTES){
+    alert("Il PDF selezionato è troppo pesante per il salvataggio diretto in Firestore. Riduci il PDF oppure sistema Firebase Storage.");
+    console.warn("[ATTACHMENT] PDF too large for Firestore base64 fallback", {
+      checkId,
+      kind: key,
+      bytes: file.size || null,
+      limit: FIRESTORE_BASE64_ATTACHMENT_MAX_BYTES,
+      storageEnabled: ENABLE_FIREBASE_STORAGE_UPLOAD === true
+    });
+    return null;
+  }
+
+  if(ENABLE_FIREBASE_STORAGE_UPLOAD !== true){
+    console.info("[ATTACHMENT] Firebase Storage upload disabled. Saving PDF as Firestore base64 fallback.", {
+      checkId,
+      kind: key,
+      bytes: file.size,
+      name: file.name
+    });
+    const attachmentB64 = await fileToBase64(file);
+    console.warn("[ATTACHMENT] Base64 fallback active", { checkId, kind: key, bytes: base.attachmentBytes });
+    return { ...base, mode:"base64", attachmentB64 };
+  }
+
+  if(storageUploadEnabled){
+    try{
+      return await uploadAttachmentToStorage({ checkId, key, file });
+    }catch(err){
+      console.error("[ATTACHMENT] Storage upload error", { checkId, kind: key, bucket: firebaseConfig.storageBucket, error: err?.message || String(err) });
       storageUploadEnabled = false;
       if(!storageUploadWarned){
         storageUploadWarned = true;
-        alert("Upload su cloud non disponibile (CORS/rete). Salvo gli allegati nel controllo (base64) per non perdere dati.");
+        alert(buildBase64FallbackMessage(err));
       }
     }
-    throw err;
+  }else{
+    console.info("[ATTACHMENT] Storage skipped (disabled after previous failure)", { checkId, kind: key, bucket: firebaseConfig.storageBucket });
   }
+
+  const attachmentB64 = await fileToBase64(file);
+  console.warn("[ATTACHMENT] Base64 fallback active", { checkId, kind: key, bytes: base.attachmentBytes });
+  return { ...base, mode:"base64", attachmentB64 };
 }
 
 async function fetchBytesFromUrl(url){
@@ -3345,24 +3395,15 @@ async function saveCheck(){
           attachmentName = file.name || "allegato.pdf";
           attachmentBytes = file.size || null;
           try{
-            const up = await uploadAttachmentToStorage({ checkId, key: c.key, file });
-            if(up){
-              attachmentName = up?.attachmentName ?? attachmentName;
-              attachmentUrl = up?.attachmentUrl ?? null;
-              attachmentPath = up?.attachmentPath ?? null;
-              attachmentBytes = up?.attachmentBytes ?? attachmentBytes;
-            }else{
-              attachmentB64 = await fileToBase64(file);
-            }
+            const prepared = await preparePdfAttachment({ checkId, key: c.key, file });
+            attachmentName = prepared?.attachmentName ?? attachmentName;
+            attachmentUrl = prepared?.attachmentUrl ?? null;
+            attachmentPath = prepared?.attachmentPath ?? null;
+            attachmentBytes = prepared?.attachmentBytes ?? attachmentBytes;
+            attachmentB64 = prepared?.attachmentB64 ?? null;
           }catch(err){
             console.error(err);
-            try{
-              attachmentB64 = await fileToBase64(file);
-              console.warn(`Upload storage fallito per ${c.key}, allegato salvato inline (base64).`);
-            }catch(encErr){
-              console.error(encErr);
-              alert("Errore allegato PDF: impossibile salvare il file. Prova a rinominare/ricomprimere il file.");
-            }
+            alert("Errore allegato PDF: impossibile salvare il file. Prova a rinominare/ricomprimere il file.");
           }
         }
       }
@@ -3952,19 +3993,15 @@ async function saveDetail(){
     r.attachmentB64 = null;
 
     try{
-      const up = await uploadAttachmentToStorage({ checkId: detailCheck.id, key: r.key, file: pendingFile });
-      if(up){
-        r.attachmentName = up?.attachmentName ?? r.attachmentName;
-        r.attachmentUrl = up?.attachmentUrl ?? null;
-        r.attachmentPath = up?.attachmentPath ?? null;
-        r.attachmentBytes = up?.attachmentBytes ?? r.attachmentBytes;
-      }else{
-        r.attachmentB64 = await fileToBase64(pendingFile);
-      }
+      const prepared = await preparePdfAttachment({ checkId: detailCheck.id, key: r.key, file: pendingFile });
+      r.attachmentName = prepared?.attachmentName ?? r.attachmentName;
+      r.attachmentUrl = prepared?.attachmentUrl ?? null;
+      r.attachmentPath = prepared?.attachmentPath ?? null;
+      r.attachmentBytes = prepared?.attachmentBytes ?? r.attachmentBytes;
+      r.attachmentB64 = prepared?.attachmentB64 ?? null;
     }catch(err){
       console.error(err);
-      r.attachmentB64 = await fileToBase64(pendingFile);
-      console.warn(`Upload storage fallito per ${r.key}, allegato salvato inline (base64).`);
+      alert("Errore allegato PDF: impossibile salvare il file. Prova a rinominare/ricomprimere il file.");
     }
   }
 
@@ -4055,13 +4092,13 @@ async function restoreBackup(obj){
 
   for(const p of obj.products){
     if(!p || !p.code) continue;
-    await put(t.objectStore(STORES.products), p);
+    await put(t.objectStore(STORES.products), toFirestoreSafe(p));
   }
   for(const c of checks){
     // Ogni check deve avere un id (document id). Se manca, lo rigenero.
     if(!c) continue;
     if(!c.id) c.id = uuid();
-    await put(t.objectStore(STORES.checks), c);
+    await put(t.objectStore(STORES.checks), sanitizeCheckDocument(c));
   }
 }
 
