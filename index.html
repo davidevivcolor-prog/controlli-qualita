@@ -1225,6 +1225,8 @@ const firebaseConfig = {
   appId: "1:1051668384383:web:bfaf1d99f9c9b7f8c74d4a",
   measurementId: "G-B40QTFGQFH"
 };
+const ENABLE_FIREBASE_STORAGE_UPLOAD = false;
+const FIRESTORE_BASE64_ATTACHMENT_MAX_BYTES = 650000;
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 // App Check (reCAPTCHA v3) - incolla qui la SITE KEY che ti mostra Firebase App Check
@@ -1235,8 +1237,11 @@ initializeAppCheck(app, {
 const fs = getFirestore(app);
 const storage = getStorage(app, "gs://controlli-qualita.firebasestorage.app");
 console.log("STORAGE_BUCKET_ACTIVE_MARKER_2026_05_05", firebaseConfig.storageBucket);
-let storageUploadEnabled = true;
+let storageUploadEnabled = ENABLE_FIREBASE_STORAGE_UPLOAD === true;
 let storageUploadWarned = false;
+if(ENABLE_FIREBASE_STORAGE_UPLOAD !== true){
+  console.info("Modalità allegati: fallback Firestore base64 attivo (Storage disattivato da configurazione)");
+}
 
 
 // Collections
@@ -1591,7 +1596,42 @@ async function preparePdfAttachment({ checkId, key, file }){
   const safeName = (file.name || "allegato.pdf").replace(/[\\/]+/g,"_");
   const base = { attachmentName: safeName, attachmentBytes: file.size || null, attachmentUrl: null, attachmentPath: null, attachmentB64: null };
 
-  if(storageUploadEnabled){
+  if((file.size || 0) > FIRESTORE_BASE64_ATTACHMENT_MAX_BYTES){
+    alert("Il PDF selezionato è troppo pesante per il salvataggio diretto in Firestore. Riduci il PDF oppure sistema Firebase Storage.");
+    console.warn("[ATTACHMENT] PDF too large for Firestore base64 fallback", {
+      checkId,
+      kind: key,
+      bytes: file.size || null,
+      limit: FIRESTORE_BASE64_ATTACHMENT_MAX_BYTES,
+      storageEnabled: ENABLE_FIREBASE_STORAGE_UPLOAD === true
+    });
+    return null;
+  }
+
+  if(ENABLE_FIREBASE_STORAGE_UPLOAD !== true){
+    console.info("[ATTACHMENT] Firebase Storage upload disabled. Saving PDF as Firestore base64 fallback.", {
+      checkId,
+      kind: key,
+      bytes: file.size || null,
+      name: file.name || null
+    });
+    const attachmentB64 = await fileToBase64(file);
+    console.warn("[ATTACHMENT] Base64 fallback active", {
+      checkId,
+      kind: key,
+      bytes: file.size || null
+    });
+    return {
+      attachmentName: file.name || "allegato.pdf",
+      attachmentBytes: file.size || null,
+      attachmentUrl: null,
+      attachmentPath: null,
+      attachmentB64,
+      mode: "base64"
+    };
+  }
+
+  if(ENABLE_FIREBASE_STORAGE_UPLOAD === true && storageUploadEnabled){
     try{
       return await uploadAttachmentToStorage({ checkId, key, file });
     }catch(err){
