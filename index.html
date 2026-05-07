@@ -1612,12 +1612,23 @@ async function preparePdfAttachment({ checkId, key, file }){
     console.info("[ATTACHMENT] Firebase Storage upload disabled. Saving PDF as Firestore base64 fallback.", {
       checkId,
       kind: key,
-      bytes: file.size,
-      name: file.name
+      bytes: file.size || null,
+      name: file.name || null
     });
     const attachmentB64 = await fileToBase64(file);
-    console.warn("[ATTACHMENT] Base64 fallback active", { checkId, kind: key, bytes: base.attachmentBytes });
-    return { ...base, mode:"base64", attachmentB64 };
+    console.warn("[ATTACHMENT] Base64 fallback active", {
+      checkId,
+      kind: key,
+      bytes: file.size || null
+    });
+    return {
+      attachmentName: file.name || "allegato.pdf",
+      attachmentBytes: file.size || null,
+      attachmentUrl: null,
+      attachmentPath: null,
+      attachmentB64,
+      mode: "base64"
+    };
   }
 
   if(ENABLE_FIREBASE_STORAGE_UPLOAD === true && storageUploadEnabled){
