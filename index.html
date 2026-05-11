@@ -475,6 +475,17 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             <input id="allProductsSearch" placeholder="Scrivi per filtrare..." autocomplete="off" />
           </div>
           <div>
+            <label style="margin-top:0">Ordina per</label>
+            <select id="allProductsSort">
+              <option value="name_asc">Nome prodotto A-Z</option>
+              <option value="name_desc">Nome prodotto Z-A</option>
+              <option value="last_desc">Data ultimo controllo più recente</option>
+              <option value="last_asc">Data ultimo controllo meno recente</option>
+              <option value="lot_asc">Lotto A-Z</option>
+              <option value="lot_desc">Lotto Z-A</option>
+            </select>
+          </div>
+          <div>
             <label style="margin-top:0">Vista</label>
             <select id="allProductsViewMode">
               <option value="auto">Auto</option>
@@ -2536,8 +2547,7 @@ function renderAllProductsTable
     return;
   }
 
-  // Sort stable by code
-  list.slice().sort((a,b)=> (a.code||"").localeCompare(b.code||"")).forEach(r=>{
+  list.forEach(r=>{
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="mono"><b>${esc(r.code || "")}</b></td>
@@ -4930,6 +4940,38 @@ function productMatchesQuery(p, q){
   return s.includes(q);
 }
 
+function cmpNullableText(a, b, dir=1){
+  const aa = String(a || "").trim();
+  const bb = String(b || "").trim();
+  if(!aa && !bb) return 0;
+  if(!aa) return 1;
+  if(!bb) return -1;
+  return aa.localeCompare(bb, "it", { sensitivity:"base", numeric:true }) * dir;
+}
+
+function cmpNullableDateISO(a, b, dir=1){
+  const aa = String(a || "");
+  const bb = String(b || "");
+  if(!aa && !bb) return 0;
+  if(!aa) return 1;
+  if(!bb) return -1;
+  return aa.localeCompare(bb) * dir;
+}
+
+function sortAllProductsRows(rows, sortKey){
+  const list = Array.isArray(rows) ? rows.slice() : [];
+  const key = sortKey || "name_asc";
+  list.sort((a,b)=>{
+    if(key === "name_desc") return cmpNullableText(a.name, b.name, -1) || cmpNullableText(a.code, b.code, 1);
+    if(key === "last_desc") return cmpNullableDateISO(a.lastDate, b.lastDate, -1) || cmpNullableText(a.name, b.name, 1) || cmpNullableText(a.code, b.code, 1);
+    if(key === "last_asc") return cmpNullableDateISO(a.lastDate, b.lastDate, 1) || cmpNullableText(a.name, b.name, 1) || cmpNullableText(a.code, b.code, 1);
+    if(key === "lot_asc") return cmpNullableText(a.lastLot, b.lastLot, 1) || cmpNullableText(a.name, b.name, 1) || cmpNullableText(a.code, b.code, 1);
+    if(key === "lot_desc") return cmpNullableText(a.lastLot, b.lastLot, -1) || cmpNullableText(a.name, b.name, 1) || cmpNullableText(a.code, b.code, 1);
+    return cmpNullableText(a.name, b.name, 1) || cmpNullableText(a.code, b.code, 1);
+  });
+  return list;
+}
+
 async function openProduct(code){
   await loadProduct(code);
 }
@@ -4975,6 +5017,7 @@ function renderAllProductsCards(rows){
 function applyAllProductsUI(){
   const q = (document.getElementById("allProductsSearch")?.value || "").trim();
   const mode = document.getElementById("allProductsViewMode")?.value || "auto";
+  const sortKey = document.getElementById("allProductsSort")?.value || "name_asc";
   const isMobile = window.matchMedia("(max-width:720px)").matches;
   const cards = document.getElementById("allProductsCards");
   const table = document.querySelector("#viewAllProducts .tableWrap");
@@ -4987,9 +5030,10 @@ function applyAllProductsUI(){
 
   const base = Array.isArray(window.__allProductsCache) ? window.__allProductsCache : [];
   const filtered = base.filter(p=>productMatchesQuery(p, q));
+  const sorted = sortAllProductsRows(filtered, sortKey);
 
-  renderAllProductsTable(filtered);
-  renderAllProductsCards(filtered);
+  renderAllProductsTable(sorted);
+  renderAllProductsCards(sorted);
 }
 
 async function deleteProductFlow(code){
@@ -5276,6 +5320,7 @@ async function renderAllProducts(){
 
   const s = document.getElementById("allProductsSearch");
   const v = document.getElementById("allProductsViewMode");
+  const sort = document.getElementById("allProductsSort");
   if(s && !s.__bound){
     s.__bound = true;
     s.addEventListener("input", ()=>{
@@ -5286,6 +5331,10 @@ async function renderAllProducts(){
   if(v && !v.__bound){
     v.__bound = true;
     v.addEventListener("change", applyAllProductsUI);
+  }
+  if(sort && !sort.__bound){
+    sort.__bound = true;
+    sort.addEventListener("change", applyAllProductsUI);
   }
 
   applyAllProductsUI();
