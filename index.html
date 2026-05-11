@@ -1355,6 +1355,10 @@ let detailCheck = null;
 let detailOriginal = null;
 let lastReturnView = 'home';
 const pendingDetailFiles = new Map();
+let operatorsSyncPromise = null;
+let allProductsRowsCache = null;
+let allProductsRowsCacheAt = 0;
+const ALL_PRODUCTS_CACHE_TTL_MS = 15000;
 
 // Compat layer (keeps most of your code unchanged)
 function tx(storeNames, mode="readonly"){
@@ -2280,6 +2284,16 @@ function showView(name){
     return;
   }
   target.classList.remove("hide");
+
+  // Accessibilità/UX: porta il focus sulla vista attiva per utenti tastiera/screen reader
+  if(!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+  try{ target.focus({ preventScroll:true }); }catch(_){ }
+}
+
+function setAriaBusy(targetOrId, busy){
+  const el = typeof targetOrId === "string" ? document.getElementById(targetOrId) : targetOrId;
+  if(!el) return;
+  el.setAttribute("aria-busy", busy ? "true" : "false");
 }
 
 /* =========================
@@ -2537,20 +2551,20 @@ async function renderHomeDraftChecks(){
 async function renderHomeRecentProducts(){
   const box = document.getElementById("homeRecentProducts");
   if(!box) return;
+  setAriaBusy(box, true);
   box.innerHTML = '<div class="muted">Caricamento…</div>';
-
-  let recentChecks = [];
   try{
-    const qy = query(collection(fs, COL_CHECKS), orderBy("dateISO","desc"), limit(30));
-    const snap = await getDocs(qy);
-    recentChecks = snap.docs.map(d=>d.data());
-  }catch(err){
-    console.warn("renderHomeRecentProducts query failed, fallback:", err);
-    const t = tx([STORES.checks]);
-    recentChecks = await getAll(t.objectStore(STORES.checks));
-    recentChecks.sort((a,b)=> (b.dateISO||"").localeCompare(a.dateISO||""));
-    recentChecks = recentChecks.slice(0,30);
-  }
+    let recentChecks = [];
+    try{
+      const qy = query(collection(fs, COL_CHECKS), orderBy("dateISO","desc"), limit(30));
+      const snap = await getDocs(qy);
+      recentChecks = snap.docs.map(d=>d.data());
+    }catch(err){
+      // Nota: evitare fallback getAll(checks) qui, perché su dataset grandi peggiora UX/costi.
+      console.warn("renderHomeRecentProducts query failed:", err);
+      box.innerHTML = '<div class="muted">Impossibile caricare i recenti ora. Riprova tra poco.</div>';
+      return;
+    }
 
   const seen = new Set();
   const picked = [];
@@ -2580,13 +2594,13 @@ async function renderHomeRecentProducts(){
     by: c.meta?.effettuatoDa ?? ""
   }));
 
-  if(rows.length===0){
-    box.innerHTML = `<div class="muted">Nessun controllo registrato.</div>`;
-    return;
-  }
+    if(rows.length===0){
+      box.innerHTML = `<div class="muted">Nessun controllo registrato.</div>`;
+      return;
+    }
 
-  box.innerHTML = "";
-  for(const r of rows){
+    box.innerHTML = "";
+    for(const r of rows){
     const card = document.createElement("div");
     card.className = "controlCard";
     card.innerHTML = `
@@ -2601,12 +2615,15 @@ async function renderHomeRecentProducts(){
     box.appendChild(card);
   }
 
-  box.querySelectorAll("button[data-openprod]").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
-      const code = btn.getAttribute("data-openprod");
-      await loadProduct(code);
+    box.querySelectorAll("button[data-openprod]").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        const code = btn.getAttribute("data-openprod");
+        await loadProduct(code);
+      });
     });
-  });
+  }finally{
+    setAriaBusy(box, false);
+  }
 }
 
 function renderAllProductsTable
@@ -3085,6 +3102,7 @@ async function saveNewProduct(){
   const p = { code, name, createdAtISO: new Date().toISOString(), noteOperative, controls: workingControlsNew };
   const t = tx([STORES.products], "readwrite");
   await put(t.objectStore(STORES.products), p);
+  invalidateAllProductsRowsCache();
 
   await refreshKPIs();
   await renderHomeRecentProducts();
@@ -3147,6 +3165,7 @@ async function saveSetup(){
       const t = tx([STORES.products], "readwrite");
       await put(t.objectStore(STORES.products), p);
     }
+    invalidateAllProductsRowsCache();
 
     await loadProduct(newCode);
   }catch(err){
@@ -4197,6 +4216,7 @@ async function restoreBackup(obj){
     if(!c.id) c.id = uuid();
     await put(t.objectStore(STORES.checks), sanitizeCheckDocument(c));
   }
+  invalidateAllProductsRowsCache();
 }
 
 /* =========================
@@ -4544,6 +4564,7 @@ on("wipeBtn","click",async ()=>{
   if(!c2) return;
 
   await withButtonLoading("wipeBtn", ()=>wipeAllFirestore(), { loadingText:"Reset...", loadingStatus:"DB: reset database cloud in corso…", errorStatus:"DB: errore reset database cloud" });
+  invalidateAllProductsRowsCache();
   currentCode = null;
   cachedProduct = null;
   showView("home");
@@ -4660,6 +4681,18 @@ async function syncOperatorsFromCloud(){
 
   try{ renderOperatorsList(); }catch(_){}
   try{ renderOperatorPickers(); }catch(_){}
+}
+function ensureOperatorsSynced(){
+  if(!operatorsSyncPromise){
+    operatorsSyncPromise = syncOperatorsFromCloud()
+      .catch(err=>{
+        console.warn("Sync operatori non disponibile:", err);
+      })
+      .finally(()=>{
+        operatorsSyncPromise = null;
+      });
+  }
+  return operatorsSyncPromise;
 }
 
 // --- Operator keys / stable IDs ---
@@ -5106,7 +5139,7 @@ function renderOperatorPickers(){
       renderHomeRecentProducts(),
       renderHomeDraftChecks(),
       renderBackupHealth(),
-      syncOperatorsFromCloud().catch(err=>console.warn("Sync operatori non disponibile:", err))
+      ensureOperatorsSynced()
     ]);
   }catch(err){
     document.getElementById("dbStatus").textContent = "DB: ERRORE";
@@ -5214,8 +5247,8 @@ function applyAllProductsUI(){
   const filtered = base.filter(p=>productMatchesQuery(p, q));
   const sorted = sortAllProductsRows(filtered, sortKey);
 
-  renderAllProductsTable(sorted);
-  renderAllProductsCards(sorted);
+  if(wantTable) renderAllProductsTable(sorted);
+  if(wantCards) renderAllProductsCards(sorted);
 }
 
 async function deleteProductFlow(code){
@@ -5225,6 +5258,7 @@ async function deleteProductFlow(code){
 
   try{
     await deleteProductAndChecks(code);
+    invalidateAllProductsRowsCache();
 
     if(currentCode === code){
       currentCode = null;
@@ -5295,7 +5329,23 @@ function countBusinessDays(start, end){
   }
   return n;
 }
+const STATS_CACHE_MAX = 6;
+const statsRangeCache = new Map();
+function makeStatsCacheKey(startISO, endISO){
+  return `${startISO}__${endISO}`;
+}
+function rememberStatsCache(key, list){
+  if(!key) return;
+  if(statsRangeCache.has(key)) statsRangeCache.delete(key);
+  statsRangeCache.set(key, list);
+  while(statsRangeCache.size > STATS_CACHE_MAX){
+    const oldest = statsRangeCache.keys().next().value;
+    statsRangeCache.delete(oldest);
+  }
+}
 async function fetchChecksInRange(startISO, endISO){
+  const ck = makeStatsCacheKey(startISO, endISO);
+  if(statsRangeCache.has(ck)) return statsRangeCache.get(ck);
   const out = [];
   let last = null;
   while(true){
@@ -5313,6 +5363,7 @@ async function fetchChecksInRange(startISO, endISO){
     last = snap.docs[snap.docs.length-1];
     if(snap.docs.length < 800) break;
   }
+  rememberStatsCache(ck, out);
   return out;
 }
 
@@ -5359,7 +5410,10 @@ async function openStats(){
 }
 
 async function runStats(){
-  const mode = document.getElementById("statsMode")?.value || "month";
+  const statsRoot = document.getElementById("viewStats");
+  setAriaBusy(statsRoot, true);
+  try{
+    const mode = document.getElementById("statsMode")?.value || "month";
   let start, end;
 
   if(mode==="year"){
@@ -5467,15 +5521,27 @@ async function runStats(){
       }
     }
   }
+  }finally{
+    setAriaBusy(statsRoot, false);
+  }
+}
+
+function invalidateAllProductsRowsCache(){
+  allProductsRowsCache = null;
+  allProductsRowsCacheAt = 0;
 }
 
 async function buildAllProductsRows(){
+  const now = Date.now();
+  if(allProductsRowsCache && (now - allProductsRowsCacheAt) < ALL_PRODUCTS_CACHE_TTL_MS){
+    return allProductsRowsCache.slice();
+  }
   const t = tx([STORES.products]);
   const products = await getAll(t.objectStore(STORES.products));
 
   products.sort((a,b)=> (a.code||"").localeCompare(b.code||""));
 
-  return products.map(p=>{
+  const rows = products.map(p=>{
     const st = p.stats || {};
     return {
       code: p.code,
@@ -5486,19 +5552,25 @@ async function buildAllProductsRows(){
       lastBy: st.lastByQc || ""
     };
   });
+  allProductsRowsCache = rows;
+  allProductsRowsCacheAt = now;
+  return rows.slice();
 }
 
 
 window.addEventListener
-("load", ()=>{ syncOperatorsFromCloud(); });
+("load", ()=>{ ensureOperatorsSynced(); });
 window.addEventListener("resize", ()=> {
   clearTimeout(window.__apResizeT);
   window.__apResizeT = setTimeout(applyAllProductsUI, 120);
 });
 
 async function renderAllProducts(){
-  const rows = await buildAllProductsRows();
-  window.__allProductsCache = rows;
+  const view = document.getElementById("viewAllProducts");
+  setAriaBusy(view, true);
+  try{
+    const rows = await buildAllProductsRows();
+    window.__allProductsCache = rows;
 
   const s = document.getElementById("allProductsSearch");
   const v = document.getElementById("allProductsViewMode");
@@ -5507,7 +5579,8 @@ async function renderAllProducts(){
     s.__bound = true;
     s.addEventListener("input", ()=>{
       clearTimeout(window.__allProductsSearchT);
-      window.__allProductsSearchT = setTimeout(applyAllProductsUI, 120);
+      const isMobile = window.matchMedia("(max-width:720px)").matches;
+      window.__allProductsSearchT = setTimeout(applyAllProductsUI, isMobile ? 220 : 150);
     });
   }
   if(v && !v.__bound){
@@ -5519,7 +5592,10 @@ async function renderAllProducts(){
     sort.addEventListener("change", applyAllProductsUI);
   }
 
-  applyAllProductsUI();
+    applyAllProductsUI();
+  }finally{
+    setAriaBusy(view, false);
+  }
 }
 
 </script>
