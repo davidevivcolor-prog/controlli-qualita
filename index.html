@@ -242,6 +242,19 @@
     .prodCardBtns{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
     .prodCardBtns .smallbtn{ min-height:36px; }
 
+
+    .operatorRoleGrid{ display:grid; gap:12px; grid-template-columns:1fr; margin-top:12px; }
+    @media(min-width:760px){ .operatorRoleGrid{ grid-template-columns:1fr 1fr; } }
+    .operatorRoleCard{ border:1px solid var(--b); border-radius:16px; background:#fff; padding:16px; cursor:pointer; box-shadow:var(--shadow); }
+    .operatorRoleCard:hover{ border-color:rgba(14,165,233,.4); }
+    .operatorSectionHead{ display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+    .simpleBarChart{ border:1px solid var(--b); border-radius:14px; padding:12px; background:#fff; margin-top:10px; }
+    .simpleBarTrack{ display:flex; align-items:flex-end; gap:8px; min-height:220px; overflow-x:auto; padding-bottom:6px; }
+    .simpleBarCol{ min-width:72px; display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .simpleBar{ width:100%; border-radius:8px 8px 0 0; background:linear-gradient(180deg,#0ea5e9,#0284c7); min-height:2px; }
+    .simpleBarVal{ font-size:12px; font-weight:900; }
+    .simpleBarLbl{ font-size:11px; color:var(--m); text-align:center; line-height:1.2; word-break:break-word; }
+
     @media(max-width:720px){ #viewAllProducts .tableWrap{ display:none; } }
 
   /* ===== CoA Modal ===== */
@@ -957,6 +970,48 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
           </div>
         </div>
 
+        <div id="operatorsRoleChooser" style="margin-top:12px">
+          <div class="muted">Seleziona una sezione</div>
+          <div class="operatorRoleGrid">
+            <button class="operatorRoleCard" id="openProduzioneSection" type="button">
+              <div class="title">Produzione</div>
+              <div class="muted">Statistiche + storico operatori di produzione</div>
+            </button>
+            <button class="operatorRoleCard" id="openQualitaSection" type="button">
+              <div class="title">Qualità</div>
+              <div class="muted">Statistiche + storico operatori qualità</div>
+            </button>
+          </div>
+        </div>
+
+        <div id="operatorsRoleDetail" class="hide" style="margin-top:12px">
+          <div class="operatorSectionHead">
+            <div>
+              <div class="muted" id="operatorsRoleMeta">Sezione</div>
+              <div class="title" id="operatorsRoleTitle">—</div>
+            </div>
+            <div class="btns" style="margin-top:0"><button id="operatorsRoleBackBtn">Indietro</button></div>
+          </div>
+
+          <div style="margin-top:10px;max-width:280px">
+            <label style="margin-top:0">Dato visualizzato nel grafico</label>
+            <select id="operatorChartMetric">
+              <option value="checks">controlli fatti</option>
+              <option value="ok">OK</option>
+              <option value="out">fuori STD</option>
+              <option value="corrected">correzioni</option>
+            </select>
+          </div>
+          <div id="operatorsBarChart" class="simpleBarChart"></div>
+
+          <div class="hr"></div>
+          <div class="topline">
+            <div><div class="muted">Elenco</div><div class="title">Operatori salvati</div></div>
+            <span class="tag">Storico operatore</span>
+          </div>
+          <div id="operatorsList" style="margin-top:12px"></div>
+        </div>
+
         <div class="hr"></div>
 
         <div class="topline">
@@ -998,18 +1053,6 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
           <button class="primary" id="saveOperatorBtn">Salva</button>
           <button id="cancelEditOperatorBtn" class="secondary hide">Annulla</button>
         </div>
-
-        <div class="hr"></div>
-
-        <div class="topline">
-          <div>
-            <div class="muted">Elenco</div>
-            <div class="title">Operatori salvati</div>
-          </div>
-          <span class="tag">Usati nei controlli</span>
-        </div>
-
-        <div id="operatorsList" style="margin-top:12px"></div>
       </div>
 
       <!-- OPERATOR HISTORY -->
@@ -4239,9 +4282,13 @@ on("addCustomControlBtnNew","click",()=> addCustomControl("new"));
 on("addCustomControlBtnEdit","click",()=> addCustomControl("edit"));
 
 on("newCheckBtn","click",()=> startNewCheck());
-on("operatorsBtn","click",async ()=>{ await syncOperatorsFromCloud(); renderOperatorsList(); resetOperatorForm(); showView("operators"); });
+on("operatorsBtn","click",async ()=>{ await syncOperatorsFromCloud(); closeOperatorsRoleSection(); renderOperatorsList(); resetOperatorForm(); showView("operators"); });
+on("openProduzioneSection","click",async ()=>{ await openOperatorsRoleSection("produzione"); });
+on("openQualitaSection","click",async ()=>{ await openOperatorsRoleSection("qualita"); });
+on("operatorsRoleBackBtn","click",()=> closeOperatorsRoleSection());
+on("operatorChartMetric","change",async ()=>{ if(!selectedOperatorsRole) return; const rows = await buildOperatorRoleStats(selectedOperatorsRole); renderOperatorBars(rows); });
 on("operatorsBackBtn","click",()=> showView("home"));
-on("backToOperatorsBtn","click",()=>{ renderOperatorsList(); showView("operators"); });
+on("backToOperatorsBtn","click",()=>{ renderOperatorsList(selectedOperatorsRole); showView("operators"); });
 
 on("cancelEditOperatorBtn","click",()=>{ resetOperatorForm(); });
 
@@ -4603,6 +4650,67 @@ function isOperatorInList(input, formattedList){
     return n.includes(v);
   });
 }
+
+let selectedOperatorsRole = null;
+
+function getRoleField(role){ return role==="produzione" ? "prodottoDa" : "effettuatoDa"; }
+function getRoleLabel(role){ return role==="produzione" ? "Produzione" : "Qualità"; }
+
+async function buildOperatorRoleStats(role){
+  const ops = ensureOperatorIds(loadOperators()).filter(o=>(o.role||"").toLowerCase()===role);
+  const byName = new Map(ops.map(o=>[formatOperator(o), { op:o, checks:0, ok:0, out:0, corrected:0 }]));
+  let checks = [];
+  try{
+    const snap = await getDocs(collection(fs, COL_CHECKS));
+    checks = snap.docs.map(d=>d.data());
+  }catch(err){
+    console.warn('buildOperatorRoleStats checks fallback:', err);
+    const t = tx([STORES.checks]);
+    checks = await getAll(t.objectStore(STORES.checks));
+  }
+  const field = getRoleField(role);
+  for(const c of checks){
+    const who = (c.meta?.[field]||"").trim();
+    if(!byName.has(who)) continue;
+    const row = byName.get(who);
+    row.checks += 1;
+    if((c.outcome||"")==="OK") row.ok += 1; else if(c.outcome) row.out += 1;
+    if(c.corretto) row.corrected += 1;
+  }
+  return [...byName.values()].sort((a,b)=> a.op.code.localeCompare(b.op.code) || a.op.surname.localeCompare(b.op.surname));
+}
+
+function renderOperatorBars(rows){
+  const metric = document.getElementById('operatorChartMetric')?.value || 'checks';
+  const wrap = document.getElementById('operatorsBarChart');
+  if(!wrap) return;
+  if(!rows.length){ wrap.innerHTML = '<div class="muted">Nessun operatore in questa sezione.</div>'; return; }
+  const max = Math.max(1, ...rows.map(r=>r[metric]||0));
+  wrap.innerHTML = `<div class="simpleBarTrack">${rows.map(r=>{
+    const val = r[metric]||0;
+    const h = Math.max(2, Math.round((val/max)*180));
+    return `<div class="simpleBarCol"><div class="simpleBarVal">${val}</div><div class="simpleBar" style="height:${h}px"></div><div class="simpleBarLbl" title="${esc(formatOperator(r.op))}">${esc((r.op.code||'—').trim())}<br>${esc((r.op.surname||'').trim())}</div></div>`;
+  }).join('')}</div>`;
+}
+
+async function openOperatorsRoleSection(role){
+  selectedOperatorsRole = role;
+  document.getElementById('operatorsRoleChooser')?.classList.add('hide');
+  document.getElementById('operatorsRoleDetail')?.classList.remove('hide');
+  document.getElementById('operatorsRoleMeta').textContent = 'Sezione operatori';
+  document.getElementById('operatorsRoleTitle').textContent = getRoleLabel(role);
+  document.getElementById('operatorChartMetric').value = 'checks';
+  const rows = await buildOperatorRoleStats(role);
+  renderOperatorBars(rows);
+  renderOperatorsList(role);
+}
+
+function closeOperatorsRoleSection(){
+  selectedOperatorsRole = null;
+  document.getElementById('operatorsRoleDetail')?.classList.add('hide');
+  document.getElementById('operatorsRoleChooser')?.classList.remove('hide');
+}
+
 function formatOperator(o){
   const code = (o.code||"").trim();
   const surname = (o.surname||"").trim();
@@ -4646,7 +4754,7 @@ function startEditOperator(op){
 }
 
 async function openOperatorHistory(opId){
-  const ops = ensureOperatorIds(loadOperators());
+  const ops = ensureOperatorIds(loadOperators()).filter(o=> !roleFilter || (o.role||"").toLowerCase()===roleFilter);
   const op = ops.find(o=>o.id===opId);
   if(!op) return alert("Operatore non trovato.");
   await renderOperatorHistory(op);
@@ -4791,10 +4899,10 @@ async function renderOperatorHistory(op){
   renderList();
 }
 
-function renderOperatorsList(){
+function renderOperatorsList(roleFilter=null){
   const wrap = document.getElementById("operatorsList");
   if(!wrap) return;
-  const ops = ensureOperatorIds(loadOperators());
+  const ops = ensureOperatorIds(loadOperators()).filter(o=> !roleFilter || (o.role||"").toLowerCase()===roleFilter);
 
   if(!ops.length){
     wrap.innerHTML = '<div class="muted">Nessun operatore salvato. Aggiungine uno sopra 👆</div>';
