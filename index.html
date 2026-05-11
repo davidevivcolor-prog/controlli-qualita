@@ -365,7 +365,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
         </div>
       </div>
 
-      <label>Codice prodotto (maiuscole/minuscole indifferenti)</label>
+      <label for="codeInput">Codice prodotto (maiuscole/minuscole indifferenti)</label>
       <input id="codeInput" placeholder="Es. 2ag1c / 2AG1C" autocomplete="off" />
       <div id="codeSuggest" class="suggest"></div>
 
@@ -484,11 +484,11 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
         <div class="row2" style="margin-top:10px;">
           <div>
-            <label style="margin-top:0">Ricerca per codice, nome, lotto o operatore</label>
+            <label for="allProductsSearch" style="margin-top:0">Ricerca per codice, nome, lotto o operatore</label>
             <input id="allProductsSearch" placeholder="Scrivi per filtrare..." autocomplete="off" />
           </div>
           <div>
-            <label style="margin-top:0">Ordina per</label>
+            <label for="allProductsSort" style="margin-top:0">Ordina per</label>
             <select id="allProductsSort">
               <option value="name_asc">Nome prodotto A-Z</option>
               <option value="name_desc">Nome prodotto Z-A</option>
@@ -499,7 +499,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             </select>
           </div>
           <div>
-            <label style="margin-top:0">Vista</label>
+            <label for="allProductsViewMode" style="margin-top:0">Vista</label>
             <select id="allProductsViewMode">
               <option value="auto">Auto</option>
               <option value="table">Tabella</option>
@@ -618,7 +618,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
   <div class="row2">
     <div>
-      <label>Modalità</label>
+      <label for="statsMode">Modalità</label>
       <select id="statsMode">
         <option value="month">Mensile</option>
         <option value="year">Annuale</option>
@@ -626,7 +626,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
       </select>
     </div>
     <div>
-      <label>Periodo</label>
+      <label for="statsPeriod">Periodo</label>
       <input id="statsPeriod" type="month" />
       <input id="statsYear" type="number" min="2020" max="2100" class="hide" />
       <input id="statsWeek" type="week" class="hide" />
@@ -706,10 +706,10 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
           <button id="cancelNewProdBtn">Annulla</button>
         </div>
 
-        <label>Nome prodotto</label>
+        <label for="newProdName">Nome prodotto</label>
         <input id="newProdName" placeholder="Nome prodotto..." />
 
-        <label>NOTE (operative fisse)</label>
+        <label for="newProdNOTE">NOTE (operative fisse)</label>
         <textarea id="newProdNOTE" placeholder="Note operative fisse (visibili sempre)"></textarea>
 
         <div class="hr"></div>
@@ -743,17 +743,17 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
         <div class="row2" style="margin-top:10px">
           <div>
-            <label style="margin-top:0">Codice prodotto</label>
+            <label for="setupCode" style="margin-top:0">Codice prodotto</label>
             <input id="setupCode" placeholder="Codice (es. 2AG1C)" />
             <div class="muted" style="margin-top:6px">Modificando il codice verranno aggiornati anche tutti i controlli collegati.</div>
           </div>
           <div>
-            <label style="margin-top:0">Nome prodotto</label>
+            <label for="setupName" style="margin-top:0">Nome prodotto</label>
             <input id="setupName" placeholder="Nome prodotto" />
           </div>
         </div>
 
-        <label>NOTE (operative fisse)</label>
+        <label for="setupNOTE">NOTE (operative fisse)</label>
         <textarea id="setupNOTE"></textarea>
 
         <div class="hr"></div>
@@ -794,11 +794,11 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
         <div class="row2">
           <div>
-            <label>Data/ora (automatica)</label>
+            <label for="checkDate">Data/ora (automatica)</label>
             <input id="checkDate" type="datetime-local" disabled />
           </div>
           <div>
-            <label>Lotto (obbligatorio)</label>
+            <label for="checkLotto">Lotto (obbligatorio)</label>
             <input id="checkLotto" placeholder="Inserisci lotto..." />
           </div>
         </div>
@@ -820,22 +820,22 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
           <span class="tag">Meta</span>
         </div>
 
-        <label>Aggiunte</label>
+        <label for="checkAggiunte">Aggiunte</label>
         <textarea id="checkAggiunte" placeholder="Aggiunte / correzioni fatte..."></textarea>
 
-        <label>Note</label>
+        <label for="checkNote">Note</label>
         <textarea id="checkNote" placeholder="Note generali..."></textarea>
 
         <div class="row2">
           <div>
-            <label>Prodotto da</label>
+            <label for="checkProdottoDa">Prodotto da</label>
             <input id="checkProdottoDa" placeholder="Sigla / cognome" list="prodOperatorsDatalist" />
             <div class="muted" style="margin-top:6px">Elenco (Produzione) — scrivi per filtrare, clicca per selezionare.</div>
             <div id="prodOperatorsPick" class="btns" style="margin-top:6px"></div>
             <datalist id="prodOperatorsDatalist"></datalist>
           </div>
           <div>
-            <label>Effettuato da</label>
+            <label for="checkEffettuatoDa">Effettuato da</label>
             <input id="checkEffettuatoDa" placeholder="Sigla / cognome" list="qcOperatorsDatalist" />
             <div class="muted" style="margin-top:6px">Elenco (Qualità) — scrivi per filtrare, clicca per selezionare.</div>
             <div id="qcOperatorsPick" class="btns" style="margin-top:6px"></div>
@@ -867,7 +867,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
         <div class="row2">
           <div>
-            <label>Filtro esito</label>
+            <label for="filterOutcome">Filtro esito</label>
             <select id="filterOutcome">
               <option value="all">Tutti</option>
               <option value="OK">OK</option>
@@ -875,11 +875,11 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             </select>
           </div>
           <div>
-            <label>Da (data)</label>
+            <label for="filterFrom">Da (data)</label>
             <input id="filterFrom" type="date" />
           </div>
           <div>
-            <label>A (data)</label>
+            <label for="filterTo">A (data)</label>
             <input id="filterTo" type="date" />
           </div>
         </div>
@@ -922,11 +922,11 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
         <div class="row2">
           <div>
-            <label>Data/ora</label>
+            <label for="detailDate">Data/ora</label>
             <input id="detailDate" type="datetime-local" disabled />
           </div>
           <div>
-            <label>Lotto</label>
+            <label for="detailLotto">Lotto</label>
             <input id="detailLotto" />
           </div>
         </div>
@@ -947,19 +947,19 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
           <span class="tag">Aggiunte / Note / Firme</span>
         </div>
 
-        <label>Aggiunte</label>
+        <label for="detailAggiunte">Aggiunte</label>
         <textarea id="detailAggiunte"></textarea>
 
-        <label>Note</label>
+        <label for="detailNote">Note</label>
         <textarea id="detailNote"></textarea>
 
         <div class="row2">
           <div>
-            <label>Prodotto da</label>
+            <label for="detailProdottoDa">Prodotto da</label>
             <input id="detailProdottoDa" />
           </div>
           <div>
-            <label>Effettuato da</label>
+            <label for="detailEffettuatoDa">Effettuato da</label>
             <input id="detailEffettuatoDa" />
           </div>
         </div>
@@ -1005,7 +1005,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
           </div>
 
           <div style="margin-top:10px;max-width:280px">
-            <label style="margin-top:0">Dato visualizzato nel grafico</label>
+            <label for="operatorChartMetric" style="margin-top:0">Dato visualizzato nel grafico</label>
             <select id="operatorChartMetric">
               <option value="checks">controlli fatti</option>
               <option value="ok">OK</option>
@@ -1037,25 +1037,25 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
         <div class="row2" style="margin-top:10px">
           <div>
-            <label style="margin-top:0">Ruolo</label>
+            <label for="operatorRole" style="margin-top:0">Ruolo</label>
             <select id="operatorRole">
               <option value="produzione">Produzione</option>
               <option value="qualita">Qualità</option>
             </select>
           </div>
           <div>
-            <label style="margin-top:0">Sigla</label>
+            <label for="opCode" style="margin-top:0">Sigla</label>
             <input id="opCode" placeholder="Es. DM / PD / ..." />
           </div>
         </div>
 
         <div class="row2" style="margin-top:10px">
           <div>
-            <label style="margin-top:0">Cognome</label>
+            <label for="opSurname" style="margin-top:0">Cognome</label>
             <input id="opSurname" placeholder="Cognome" />
           </div>
           <div>
-            <label style="margin-top:0">Nome</label>
+            <label for="opName" style="margin-top:0">Nome</label>
             <input id="opName" placeholder="Nome" />
           </div>
         </div>
@@ -1146,12 +1146,12 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 
       <div class="row2">
         <div>
-          <label>Data scadenza certificato</label>
+          <label for="coaExpiry">Data scadenza certificato</label>
           <input id="coaExpiry" type="date" />
           <div class="muted">Suggerito: 1 anno dopo la data del controllo (modificabile).</div>
         </div>
         <div>
-          <label>Parametri da includere</label>
+          <div style="font-size:12px; color:var(--m); margin:10px 0 6px;">Parametri da includere</div>
           <div class="btns" style="margin-top:0">
             <button class="smallbtn" id="coaAllBtn">Tutti</button>
             <button class="smallbtn secondary" id="coaNoneBtn">Nessuno</button>
@@ -2908,8 +2908,8 @@ function buildSpecEditorHtml(c){
     return `
       <div class="row2" style="margin-top:10px">
         <div>
-          <label>Max</label>
-          <input data-spec="${k}|max" type="number" step="any" value="${c.spec?.max ?? ""}" placeholder="(vuoto = non richiesto)" />
+          <label for="spec-${k}-max">Max</label>
+          <input id="spec-${k}-max" data-spec="${k}|max" type="number" step="any" value="${c.spec?.max ?? ""}" placeholder="(vuoto = non richiesto)" />
         </div>
       </div>
     `;
@@ -2917,8 +2917,8 @@ function buildSpecEditorHtml(c){
   const extra = (c.key==="brillantezza") ? `
     <div class="row2" style="margin-top:10px">
       <div>
-        <label>Brillantezza misurata a (µm)</label>
-        <input data-extra="${k}|thickness_um" type="number" step="any" value="${c.extra?.thickness_um ?? ""}" placeholder="Es. 60" />
+        <label for="extra-${k}-thickness">Brillantezza misurata a (µm)</label>
+        <input id="extra-${k}-thickness" data-extra="${k}|thickness_um" type="number" step="any" value="${c.extra?.thickness_um ?? ""}" placeholder="Es. 60" />
       </div>
     </div>
   ` : ``;
@@ -2926,12 +2926,12 @@ function buildSpecEditorHtml(c){
   return `
     <div class="row2" style="margin-top:10px">
       <div>
-        <label>Min</label>
-        <input data-spec="${k}|min" type="number" step="any" value="${c.spec?.min ?? ""}" placeholder="(vuoto = nessun min)" />
+        <label for="spec-${k}-min">Min</label>
+        <input id="spec-${k}-min" data-spec="${k}|min" type="number" step="any" value="${c.spec?.min ?? ""}" placeholder="(vuoto = nessun min)" />
       </div>
       <div>
-        <label>Max</label>
-        <input data-spec="${k}|max" type="number" step="any" value="${c.spec?.max ?? ""}" placeholder="(vuoto = nessun max)" />
+        <label for="spec-${k}-max">Max</label>
+        <input id="spec-${k}-max" data-spec="${k}|max" type="number" step="any" value="${c.spec?.max ?? ""}" placeholder="(vuoto = nessun max)" />
       </div>
     </div>
     ${extra}
@@ -2970,8 +2970,8 @@ function renderSetupControls(mode){
 
       <div class="row2" style="margin-top:10px">
         <div>
-          <label>Unità di misura</label>
-          <input data-unit="${esc(c.key)}" value="${esc(c.unit ?? "")}" ${c.key==="macinazione" ? "disabled" : ""} />
+          <label for="unit-${esc(c.key)}">Unità di misura</label>
+          <input id="unit-${esc(c.key)}" data-unit="${esc(c.key)}" value="${esc(c.unit ?? "")}" ${c.key==="macinazione" ? "disabled" : ""} />
           <div class="muted">${c.key==="macinazione" ? "Macinazione: unità fissa µm." : ""}</div>
         </div>
       </div>
@@ -3198,8 +3198,8 @@ async function startNewCheck(draft=null){
       ? `
         <div class="row2" style="margin-top:10px">
           <div>
-            <label>Note viscosità (es. 20/30°C, R4...)</label>
-            <input data-viscnote="1" placeholder="Scrivi note viscosità..." value="${esc(draft?.meta?.viscositaNote || "")}" />
+            <label for="check-viscnote-${esc(c.key)}">Note viscosità (es. 20/30°C, R4...)</label>
+            <input id="check-viscnote-${esc(c.key)}" data-viscnote="1" placeholder="Scrivi note viscosità..." value="${esc(draft?.meta?.viscositaNote || "")}" />
           </div>
         </div>
       ` : "";
@@ -3208,8 +3208,8 @@ async function startNewCheck(draft=null){
       ? `
         <div class="row2" style="margin-top:10px">
           <div>
-            <label>Allega PDF (opzionale)</label>
-            <input data-file="${esc(c.key)}" type="file" accept="application/pdf,.pdf" />
+            <label for="check-file-${esc(c.key)}">Allega PDF (opzionale)</label>
+            <input id="check-file-${esc(c.key)}" data-file="${esc(c.key)}" type="file" accept="application/pdf,.pdf" />
             <div class="muted">Se alleghi un PDF, verrà unito alla certificazione scaricabile.</div>
           </div>
         </div>
@@ -3227,12 +3227,12 @@ async function startNewCheck(draft=null){
       ${extraLine}
       <div class="row2" style="margin-top:10px">
         <div>
-          <label>Valore</label>
-          <input data-val="${esc(c.key)}" type="number" step="any" placeholder="Inserisci valore..." value="${draftVal===null || draftVal===undefined ? "" : esc(String(draftVal))}" />
+          <label for="check-val-${esc(c.key)}">Valore</label>
+          <input id="check-val-${esc(c.key)}" data-val="${esc(c.key)}" type="number" step="any" placeholder="Inserisci valore..." value="${draftVal===null || draftVal===undefined ? "" : esc(String(draftVal))}" />
         </div>
         <div>
-          <label>Esito</label>
-          <input data-out="${esc(c.key)}" value="${esc(outValue)}" disabled />
+          <label for="check-out-${esc(c.key)}">Esito</label>
+          <input id="check-out-${esc(c.key)}" data-out="${esc(c.key)}" value="${esc(outValue)}" disabled />
         </div>
       </div>
       ${attachmentField}
@@ -3802,24 +3802,24 @@ async function openCheckDetailPage(checkId){
 
       <div class="row2" style="margin-top:10px">
         <div>
-          <label>Valore</label>
-          <input data-k="${esc(ctrl.key)}" type="number" step="any" />
+          <label for="detail-val-${esc(ctrl.key)}">Valore</label>
+          <input id="detail-val-${esc(ctrl.key)}" data-k="${esc(ctrl.key)}" type="number" step="any" />
         </div>
         <div>
-          <label>Esito</label>
-          <input data-o="${esc(ctrl.key)}" disabled />
+          <label for="detail-out-${esc(ctrl.key)}">Esito</label>
+          <input id="detail-out-${esc(ctrl.key)}" data-o="${esc(ctrl.key)}" disabled />
         </div>
       </div>
 
       ${(ctrl.key==="deltae" || ctrl.key==="resa") ? `
         <div class="row2" style="margin-top:10px">
           <div>
-            <label>Allega / sostituisci PDF (opzionale)</label>
-            <input data-detail-file="${esc(ctrl.key)}" type="file" accept="application/pdf,.pdf" />
+            <label for="detail-file-${esc(ctrl.key)}">Allega / sostituisci PDF (opzionale)</label>
+            <input id="detail-file-${esc(ctrl.key)}" data-detail-file="${esc(ctrl.key)}" type="file" accept="application/pdf,.pdf" />
             <div class="muted">${r?.attachmentName ? `Allegato attuale: <b>${esc(r.attachmentName)}</b>` : "Nessun allegato."}</div>
           </div>
           <div>
-            <label>PDF certificazione</label>
+            <div style="font-size:12px; color:var(--m); margin:10px 0 6px;">PDF certificazione</div>
             <div class="btns" style="margin-top:0">
               <button class="smallbtn secondary" data-cert="${esc(ctrl.key)}">Scarica certificazione (PDF)</button>
               <button class="smallbtn" data-attdl="${esc(ctrl.key)}" ${r?.attachmentB64 ? "" : "disabled"}>Scarica allegato</button>
@@ -3832,7 +3832,7 @@ async function openCheckDetailPage(checkId){
       ${ctrl.key==="viscosita" ? `
         <div class="row2" style="margin-top:10px">
           <div>
-            <label>Note viscosità</label>
+            <label for="detailViscNote">Note viscosità</label>
             <input id="detailViscNote" placeholder="Es. 20/30°C, R4..." />
           </div>
         </div>
