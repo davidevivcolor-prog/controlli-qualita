@@ -1212,6 +1212,40 @@ const DEFAULT_CONTROLS = [
   { key:"resa",          name:"Resa %",          type:"num_minmax", unit:"%",        enabled:false, spec:{min:null,max:null}, extra:{ allowPdf:true } }
 ];
 
+function setDbStatusMessage(msg){
+  const el = document.getElementById("dbStatus");
+  if(el) el.textContent = msg;
+}
+
+async function withButtonLoading(btnOrId, action, options = {}){
+  const btn = typeof btnOrId === "string" ? document.getElementById(btnOrId) : btnOrId;
+  const idleStatus = options.idleStatus || "DB: pronto";
+  const loadingStatus = options.loadingStatus || "";
+  const errorStatus = options.errorStatus || "DB: errore";
+  const loadingText = options.loadingText || "...";
+  const restoreText = options.restoreText !== false;
+
+  const originalText = btn ? btn.textContent : "";
+  const originalDisabled = btn ? btn.disabled : false;
+  if(btn){
+    btn.disabled = true;
+    if(restoreText) btn.textContent = loadingText;
+  }
+  if(loadingStatus) setDbStatusMessage(loadingStatus);
+  try{
+    return await action();
+  }catch(err){
+    setDbStatusMessage(errorStatus);
+    throw err;
+  }finally{
+    if(btn){
+      btn.disabled = originalDisabled;
+      if(restoreText) btn.textContent = originalText;
+    }
+    setDbStatusMessage(idleStatus);
+  }
+}
+
 function mergeControlsSchema(existing){
   const byKey = new Map((existing || []).map(c => [c.key, c]));
   const merged = DEFAULT_CONTROLS.map(def => {
@@ -4250,7 +4284,11 @@ document.addEventListener("click",(e)=>{
 on("openBtn","click",async ()=>{
   const code = normalizeCode(document.getElementById("codeInput").value);
   if(!code) return alert("Inserisci un codice.");
-  await loadProduct(code);
+  await withButtonLoading("openBtn", ()=>loadProduct(code), {
+    loadingText:"Caricamento...",
+    loadingStatus:"DB: apertura scheda prodotto…",
+    errorStatus:"DB: errore apertura prodotto"
+  });
 });
 
 on("homeBtn","click",async ()=>{
@@ -4258,14 +4296,18 @@ on("homeBtn","click",async ()=>{
   cachedProduct=null;
   document.getElementById("codeInput").value = "";
   showView("home");
-  await refreshKPIs();
-  await renderHomeRecentProducts();
-  await renderBackupHealth();
+  await withButtonLoading("homeBtn", async ()=>{
+    await refreshKPIs();
+    await renderHomeRecentProducts();
+    await renderBackupHealth();
+  }, { loadingText:"Caricamento...", loadingStatus:"DB: caricamento dashboard/home…", errorStatus:"DB: errore caricamento home" });
 });
 
 on("allProductsBtn","click",async ()=>{
-  await renderAllProducts();
-  showView("allProducts");
+  await withButtonLoading("allProductsBtn", async ()=>{
+    await renderAllProducts();
+    showView("allProducts");
+  }, { loadingText:"Caricamento...", loadingStatus:"DB: caricamento archivio prodotti…", errorStatus:"DB: errore caricamento archivio prodotti" });
 });
 
 on("statsBtn","click",async ()=>{
@@ -4282,17 +4324,27 @@ on("statsBackBtn","click",()=> showView("home"));
 on("statsRunBtn","click",runStats);
 
 on("cancelNewProdBtn","click",()=> showView("home"));
-on("saveNewProdBtn","click",saveNewProduct);
+on("saveNewProdBtn","click",async ()=> withButtonLoading("saveNewProdBtn", ()=>saveNewProduct(), {
+  loadingText:"Salvataggio...",
+  loadingStatus:"DB: salvataggio nuovo prodotto…",
+  errorStatus:"DB: errore salvataggio prodotto"
+}));
 
 on("editSetupBtn","click",openSetup);
 on("setupBackBtn","click",async ()=> loadProduct(currentCode));
-on("setupSaveBtn","click",saveSetup);
+on("setupSaveBtn","click",async ()=> withButtonLoading("setupSaveBtn", ()=>saveSetup(), {
+  loadingText:"Salvataggio...",
+  loadingStatus:"DB: salvataggio setup prodotto…",
+  errorStatus:"DB: errore setup prodotto"
+}));
 
 on("addCustomControlBtnNew","click",()=> addCustomControl("new"));
 on("addCustomControlBtnEdit","click",()=> addCustomControl("edit"));
 
 on("newCheckBtn","click",()=> startNewCheck());
-on("operatorsBtn","click",async ()=>{ await syncOperatorsFromCloud(); closeOperatorsRoleSection(); renderOperatorsList(); resetOperatorForm(); showView("operators"); });
+on("operatorsBtn","click",async ()=> withButtonLoading("operatorsBtn", async ()=>{
+  await syncOperatorsFromCloud(); closeOperatorsRoleSection(); renderOperatorsList(); resetOperatorForm(); showView("operators");
+}, { loadingText:"Caricamento...", loadingStatus:"DB: caricamento operatori…", errorStatus:"DB: errore caricamento operatori" }));
 on("openProduzioneSection","click",async ()=>{ await openOperatorsRoleSection("produzione"); });
 on("openQualitaSection","click",async ()=>{ await openOperatorsRoleSection("qualita"); });
 on("operatorsRoleBackBtn","click",()=> closeOperatorsRoleSection());
@@ -4341,15 +4393,27 @@ on("saveOperatorBtn","click",async ()=>{
 });
 
 on("cancelCheckBtn","click",async ()=> loadProduct(currentCode));
-on("saveDraftBtn","click",()=> saveCheckDraft());
+on("saveDraftBtn","click",async ()=> withButtonLoading("saveDraftBtn", ()=>saveCheckDraft(), {
+  loadingText:"Salvataggio...",
+  loadingStatus:"DB: salvataggio bozza…",
+  errorStatus:"DB: errore salvataggio bozza"
+}));
 on("deleteDraftBtn","click", async ()=>{
   if(!currentDraftId) return;
   if(!confirm("Eliminare questa bozza?")) return;
   const code = cachedProduct?.code || null;
-  const ok = await deleteDraftCheck(currentDraftId, { silent:true });
+  const ok = await withButtonLoading("deleteDraftBtn", ()=>deleteDraftCheck(currentDraftId, { silent:true }), {
+    loadingText:"Eliminazione...",
+    loadingStatus:"DB: eliminazione bozza…",
+    errorStatus:"DB: errore eliminazione bozza"
+  });
   if(ok && code) await loadProduct(code);
 });
-on("saveCheckBtn","click",saveCheck);
+on("saveCheckBtn","click",async ()=> withButtonLoading("saveCheckBtn", ()=>saveCheck(), {
+  loadingText:"Salvataggio...",
+  loadingStatus:"DB: salvataggio nuovo controllo…",
+  errorStatus:"DB: errore salvataggio controllo"
+}));
 
 // Lotto sempre MAIUSCOLO (input live)
 const __lotInp = document.getElementById("checkLotto");
@@ -4368,7 +4432,7 @@ on("historyBtn","click",async ()=>{
   document.getElementById("filterOutcome").value = "all";
   document.getElementById("filterFrom").value = "";
   document.getElementById("filterTo").value = "";
-  await renderHistory();
+  await withButtonLoading("historyBtn", ()=>renderHistory(), { loadingText:"Caricamento...", loadingStatus:"DB: apertura storico controlli…", errorStatus:"DB: errore apertura storico" });
   showView("history");
 });
 on("backToProdBtn","click",async ()=> loadProduct(currentCode));
@@ -4385,7 +4449,11 @@ on("detailBackBtn","click",async ()=>{
     await loadProduct(currentCode);
   }
 });
-on("detailSaveBtn","click",saveDetail);
+on("detailSaveBtn","click",async ()=> withButtonLoading("detailSaveBtn", ()=>saveDetail(), {
+  loadingText:"Salvataggio...",
+  loadingStatus:"DB: salvataggio modifiche controllo…",
+  errorStatus:"DB: errore salvataggio modifiche"
+}));
 
 on("detailCoABtn","click",()=>{
   openCoAModal();
@@ -4403,7 +4471,11 @@ on("coaNoneBtn","click",()=>{
 });
 on("coaGenerateBtn","click",async ()=>{
   try{
-    await generateCoAPdf();
+    await withButtonLoading("coaGenerateBtn", ()=>generateCoAPdf(), {
+      loadingText:"Generazione...",
+      loadingStatus:"DB: generazione PDF/CoA…",
+      errorStatus:"DB: errore generazione PDF"
+    });
     closeCoAModal();
   }catch(err){
     console.error(err);
@@ -4429,10 +4501,12 @@ on("exportAllCsvBtn","click",async ()=>{
 });
 
 on("backupJsonBtn","click",async ()=>{
-  const b=await makeBackup();
-  downloadText(`backup_qc_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(b,null,2));
-  try{ await markBackupDownload(); }catch(err){ console.warn("markBackupDownload failed:", err); }
-  await renderBackupHealth();
+  await withButtonLoading("backupJsonBtn", async ()=>{
+    const b=await makeBackup();
+    downloadText(`backup_qc_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(b,null,2));
+    try{ await markBackupDownload(); }catch(err){ console.warn("markBackupDownload failed:", err); }
+    await renderBackupHealth();
+  }, { loadingText:"Backup...", loadingStatus:"DB: backup JSON in corso…", errorStatus:"DB: errore backup JSON" });
 });
 on("restoreJsonBtn","click",()=> document.getElementById("restoreJsonFile").click());
 on("restoreJsonFile","change",async (e)=>{
@@ -4441,7 +4515,7 @@ on("restoreJsonFile","change",async (e)=>{
   try{
     const obj=JSON.parse(txt);
     if(!confirm("Ripristinare il backup? Sovrascrive i dati attuali.")) return;
-    await restoreBackup(obj);
+    await withButtonLoading("restoreJsonBtn", ()=>restoreBackup(obj), { loadingText:"Ripristino...", loadingStatus:"DB: ripristino JSON in corso…", errorStatus:"DB: errore ripristino JSON" });
     alert("Ripristino completato.");
     showView("home");
     await refreshKPIs();
@@ -4469,7 +4543,7 @@ on("wipeBtn","click",async ()=>{
   const c2 = confirm("Ultima conferma: SVUOTO DAVVERO tutto il database cloud?");
   if(!c2) return;
 
-  await wipeAllFirestore();
+  await withButtonLoading("wipeBtn", ()=>wipeAllFirestore(), { loadingText:"Reset...", loadingStatus:"DB: reset database cloud in corso…", errorStatus:"DB: errore reset database cloud" });
   currentCode = null;
   cachedProduct = null;
   showView("home");
