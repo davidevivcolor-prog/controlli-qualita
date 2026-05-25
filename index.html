@@ -546,6 +546,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             <div class="muted">Dettaglio prodotto</div>
             <div class="title" id="prodTitle">—</div>
             <div class="muted" id="prodMeta">—</div>
+            <div id="productDraftNotice" class="muted" style="margin-top:8px;"></div>
           </div>
           <div class="btns" style="margin-top:0">
             <button id="editSetupBtn">Configura controlli</button>
@@ -1285,6 +1286,7 @@ import {
   collection, doc,
   getDoc, setDoc, deleteDoc,
   getDocs,
+  onSnapshot,
   query, where, orderBy, limit,
   startAfter,
   getCountFromServer,
@@ -1359,6 +1361,8 @@ let operatorsSyncPromise = null;
 let allProductsRowsCache = null;
 let allProductsRowsCacheAt = 0;
 const ALL_PRODUCTS_CACHE_TTL_MS = 15000;
+let draftsCache = [];
+let draftsListenerUnsub = null;
 
 // Compat layer (keeps most of your code unchanged)
 function tx(storeNames, mode="readonly"){
@@ -2400,6 +2404,13 @@ function saveDraftChecksLocal(list){
   localStorage.setItem(DRAFTS_KEY, JSON.stringify(Array.isArray(list) ? list : []));
 }
 
+function replaceDraftsCache(list){
+  const safe = sortDraftChecks(Array.isArray(list) ? list : []);
+  draftsCache = safe;
+  saveDraftChecksLocal(safe);
+  return safe;
+}
+
 function sortDraftChecks(list){
   return (Array.isArray(list) ? list.slice() : []).sort((a,b)=>{
     const ta = Date.parse(a?.updatedAtISO || a?.createdAtISO || a?.dateISO || 0) || 0;
@@ -2430,20 +2441,51 @@ function findExistingDraftLocalByCode(code, excludeId=null){
 }
 
 async function fetchDraftChecks(){
-  const localDrafts = sortDraftChecks(loadDraftChecksLocal()).slice(0,20);
+  const localDrafts = draftsCache.length ? draftsCache.slice() : sortDraftChecks(loadDraftChecksLocal());
   try{
-    const qy = query(collection(fs, COL_DRAFTS), orderBy("updatedAtISO","desc"), limit(20));
+    const qy = query(collection(fs, COL_DRAFTS), orderBy("updatedAtISO","desc"));
     const snap = await getDocs(qy);
-    const cloudDrafts = snap.docs.map(d=> ({ id:d.id, ...d.data() }));
-    if(cloudDrafts.length){
-      saveDraftChecksLocal(cloudDrafts);
-      return cloudDrafts;
-    }
+    const cloudDrafts = replaceDraftsCache(snap.docs.map(d=> ({ id:d.id, ...d.data() })));
+    return cloudDrafts.slice(0,20);
   }catch(err){
     console.warn("fetchDraftChecks cloud fallback -> local:", err);
   }
   return localDrafts;
 }
+
+function ensureDraftsListener(){
+  if(draftsListenerUnsub) return;
+  const qy = query(collection(fs, COL_DRAFTS), orderBy("updatedAtISO","desc"));
+  draftsListenerUnsub = onSnapshot(qy, (snap)=>{
+    replaceDraftsCache(snap.docs.map(d=> ({ id:d.id, ...d.data() })));
+    renderHomeDraftChecks();
+    renderProductDraftNotice();
+  }, (err)=> console.warn("draft listener error:", err));
+}
+
+function renderProductDraftNotice(){
+  const el = document.getElementById("productDraftNotice");
+  if(!el) return;
+  const code = cachedProduct?.code || currentCode || null;
+  if(!code){ el.innerHTML = ""; return; }
+  const matches = draftsCache.filter(d=> d && d.code===code);
+  if(!matches.length){ el.innerHTML = ""; return; }
+  const label = matches.length===1
+    ? "È presente un controllo in bozza per questo prodotto."
+    : `Sono presenti ${matches.length} controlli in bozza per questo prodotto.`;
+  el.innerHTML = `${esc(label)} <button id="openProductDraftBtn" class="smallbtn secondary" style="margin-left:8px;">Apri bozza</button>`;
+  const openBtn = document.getElementById("openProductDraftBtn");
+  if(openBtn){
+    openBtn.onclick = ()=> openDraftCheck(matches[0].id);
+  }
+}
+
+window.addEventListener("beforeunload", ()=>{
+  if(draftsListenerUnsub){
+    draftsListenerUnsub();
+    draftsListenerUnsub = null;
+  }
+});
 
 function formatElapsed(ms){
   if(ms < 0) ms = 0;
@@ -2513,9 +2555,10 @@ async function renderHomeDraftChecks(){
   const box = document.getElementById("homeDraftChecks");
   if(!box) return;
   box.innerHTML = '<div class="muted">Caricamento…</div>';
-  const drafts = await fetchDraftChecks();
+  const drafts = draftsCache.length ? draftsCache.slice(0,20) : await fetchDraftChecks();
   if(!drafts.length){
     box.innerHTML = '<div class="muted">Nessuna bozza salvata.</div>';
+    renderProductDraftNotice();
     return;
   }
   box.innerHTML = drafts.map(d=> `
@@ -2546,6 +2589,7 @@ async function renderHomeDraftChecks(){
       await deleteDraftCheck(id);
     });
   });
+  renderProductDraftNotice();
 }
 
 async function renderHomeRecentProducts(){
@@ -2905,6 +2949,7 @@ async function loadProduct(rawCode){
 
   const checks = await getChecks(code);
   renderLastChecks5(p, checks);
+  renderProductDraftNotice();
 
   showView("product");
 }
@@ -3358,6 +3403,7 @@ async function saveCheckDraft(options={}){
     });
 
     upsertDraftLocal(payload);
+    replaceDraftsCache(loadDraftChecksLocal());
 
     try{
       await setDoc(doc(fs, COL_DRAFTS, draftId), payload, { merge:true });
@@ -3368,6 +3414,7 @@ async function saveCheckDraft(options={}){
     currentDraftId = draftId;
     setDraftUiState(true);
     await renderHomeDraftChecks();
+    renderProductDraftNotice();
     if(!options.silent) alert("Bozza salvata.");
     if(options.exitAfterSave){
       await loadProduct(p.code);
@@ -3387,12 +3434,14 @@ async function deleteDraftCheck(draftId=currentDraftId, options={}){
   if(!draftId) return false;
   try{
     deleteDraftLocalById(draftId);
+    replaceDraftsCache(loadDraftChecksLocal());
     try{ await deleteDoc(doc(fs, COL_DRAFTS, draftId)); }catch(err){ console.warn("Delete cloud bozza non disponibile:", err); }
     if(currentDraftId===draftId){
       currentDraftId = null;
       setDraftUiState(false);
     }
     await renderHomeDraftChecks();
+    renderProductDraftNotice();
     if(!options.silent) alert("Bozza eliminata.");
     return true;
   }catch(err){
@@ -5133,6 +5182,8 @@ function renderOperatorPickers(){
 (async function init(){
   try{
     document.getElementById("dbStatus").textContent = "DB: connesso";
+    draftsCache = sortDraftChecks(loadDraftChecksLocal());
+    ensureDraftsListener();
     showView("home");
     await Promise.all([
       refreshKPIs(),
