@@ -303,6 +303,52 @@
   }
 
 
+    .viscCurvePanel{
+      margin-top:10px;
+      border:1px solid rgba(14,165,233,.26);
+      background:linear-gradient(180deg,rgba(14,165,233,.07),#fff);
+      border-radius:16px;
+      padding:12px;
+    }
+    .viscCurveHead{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .viscCurveCanvas{
+      width:100%;
+      height:260px;
+      border:1px solid var(--b);
+      border-radius:14px;
+      background:#fff;
+      display:block;
+    }
+    .viscCurveResult{
+      margin-top:10px;
+      padding:12px;
+      border:1px solid rgba(14,165,233,.32);
+      border-radius:14px;
+      background:rgba(14,165,233,.08);
+    }
+    .viscCurveResult b{ font-size:22px; }
+    .viscCurveWarn{
+      margin-top:8px;
+      color:#92400e;
+      background:#fffbeb;
+      border:1px solid #fde68a;
+      border-radius:12px;
+      padding:8px 10px;
+      font-size:12px;
+    }
+    .viscCurveTable input{ min-width:120px; }
+    .viscTempBtnMissing{
+      background:#f8fafc;
+      border-color:#cbd5e1;
+      color:#64748b;
+    }
+    .viscTempBtnMissing::after{ content:" • curva non impostata"; font-weight:700; }
+    @media(max-width:560px){
+      .viscCurveCanvas{ height:220px; }
+      .viscCurveResult b{ font-size:18px; }
+    }
+
+
 /* Autocomplete codice prodotto */
 .suggest{ position:relative; }
 .suggest .panel{
@@ -585,6 +631,16 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             </thead>
             <tbody></tbody>
           </table>
+        </div>
+
+        <div id="productViscosityCurvePanel" class="viscCurvePanel hide">
+          <div class="viscCurveHead">
+            <div>
+              <b>Viscosità / temperatura</b>
+              <div class="muted" id="productViscosityCurveStatus">Curva non impostata.</div>
+            </div>
+            <button id="openViscosityCurveBtn" class="secondary">Curva viscosità / temperatura</button>
+          </div>
         </div>
 
         <div class="hr"></div>
@@ -1129,6 +1185,124 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
     </div>
   </div>
 
+
+  <!-- Curva viscosità / temperatura Modal -->
+  <div id="viscosityCurveOverlay" class="overlay hide" aria-hidden="true">
+    <div class="modal" style="width:min(980px,94vw)">
+      <div class="topline" style="margin-top:0">
+        <div>
+          <div class="muted">Setup prodotto</div>
+          <div class="title">Curva viscosità / temperatura</div>
+          <div class="muted">Prodotto: <span class="mono" id="viscCurveProductCode">—</span></div>
+        </div>
+        <div class="btns" style="margin-top:0">
+          <button id="viscCurveCloseBtn">Chiudi</button>
+          <button class="primary" id="viscCurveSaveBtn">Salva curva</button>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="row2">
+        <div>
+          <label for="viscCurveModel">Modello curva</label>
+          <select id="viscCurveModel">
+            <option value="exponential">Esponenziale (consigliata)</option>
+            <option value="linear">Lineare</option>
+            <option value="quadratic">Quadratica</option>
+          </select>
+          <div class="muted" style="margin-top:6px">La proporzione viene sempre calcolata dai punti salvati per questo prodotto.</div>
+        </div>
+        <div>
+          <label>Equazione calcolata</label>
+          <div class="controlCard" style="margin-top:0">
+            <div id="viscCurveEquation" class="mono">—</div>
+            <div class="muted" style="margin-top:6px">R²: <b id="viscCurveR2">—</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row2" style="margin-top:10px">
+        <div>
+          <div class="topline">
+            <b>Punti temperatura / viscosità</b>
+            <button id="viscCurveAddPointBtn" class="smallbtn secondary">+ Aggiungi punto</button>
+          </div>
+          <div class="tableWrap" style="margin-top:10px">
+            <table class="viscCurveTable">
+              <thead><tr><th>Temperatura (°C)</th><th>Viscosità (cP)</th><th class="right">Azioni</th></tr></thead>
+              <tbody id="viscCurvePointsBody"></tbody>
+            </table>
+          </div>
+          <div id="viscCurveMessage" class="muted" style="margin-top:8px"></div>
+        </div>
+        <div>
+          <b>Grafico curva</b>
+          <canvas id="viscCurveCanvas" class="viscCurveCanvas" width="760" height="320" aria-label="Grafico curva viscosità temperatura"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Correzione viscosità / temperatura Modal -->
+  <div id="viscosityCorrectionOverlay" class="overlay hide" aria-hidden="true">
+    <div class="modal" style="width:min(980px,94vw)">
+      <div class="topline" style="margin-top:0">
+        <div>
+          <div class="muted">Nuovo controllo</div>
+          <div class="title">Correzione temperatura viscosità</div>
+          <div class="muted">Prodotto: <span class="mono" id="viscCorrProductCode">—</span></div>
+        </div>
+        <div class="btns" style="margin-top:0">
+          <button id="viscCorrCloseBtn">Chiudi</button>
+          <button class="primary" id="viscCorrUseBtn">Usa valore calcolato</button>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+      <div id="viscCorrMissingBox" class="noteBox hide"></div>
+      <div id="viscCorrContent">
+        <div class="row2">
+          <div>
+            <b>Curva usata</b>
+            <div class="controlCard" style="margin-top:8px">
+              <div>Modello: <b id="viscCorrModel">—</b></div>
+              <div style="margin-top:6px">Equazione: <span class="mono" id="viscCorrEquation">—</span></div>
+              <div class="muted" style="margin-top:6px">R²: <b id="viscCorrR2">—</b></div>
+            </div>
+          </div>
+          <div>
+            <b>Grafico curva</b>
+            <canvas id="viscCorrCanvas" class="viscCurveCanvas" width="760" height="300" aria-label="Grafico correzione viscosità temperatura"></canvas>
+          </div>
+        </div>
+
+        <div class="row2" style="margin-top:10px">
+          <div>
+            <label for="viscCorrMeasuredCp">Viscosità misurata alla temperatura reale (cP)</label>
+            <input id="viscCorrMeasuredCp" type="number" step="any" min="0" placeholder="Es. 900" />
+          </div>
+          <div>
+            <label for="viscCorrMeasuredTemp">Temperatura reale misura (°C)</label>
+            <input id="viscCorrMeasuredTemp" type="number" step="any" placeholder="Es. 25" />
+          </div>
+          <div>
+            <label for="viscCorrTargetTemp">Riporta a (°C)</label>
+            <input id="viscCorrTargetTemp" type="number" step="any" placeholder="Es. 20" />
+          </div>
+        </div>
+
+        <div class="viscCurveResult">
+          <div class="muted">Risultato calcolato</div>
+          <b id="viscCorrResult">—</b>
+          <div class="muted" id="viscCorrFormula" style="margin-top:6px">Inserisci viscosità misurata e temperature.</div>
+          <div id="viscCorrWarn"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- CoA (Certificato di Analisi) Modal -->
   <div id="coaOverlay" class="overlay hide" aria-hidden="true">
     <div class="modal">
@@ -1356,6 +1530,7 @@ let workingControlsEdit = null;
 let detailCheck = null;
 let detailOriginal = null;
 let lastReturnView = 'home';
+let activeViscosityCorrection = null;
 const pendingDetailFiles = new Map();
 let operatorsSyncPromise = null;
 let allProductsRowsCache = null;
@@ -1480,6 +1655,7 @@ function sanitizeCheckDocument(check){
     corretto: !!check?.corretto,
     results: sanitizeCheckResults(check?.results),
     meta: sanitizeCheckMeta(check?.meta),
+    viscosityCorrection: sanitizeViscosityCorrection(check?.viscosityCorrection),
     modifications: sanitizeModifications(check?.modifications)
   });
 }
@@ -1496,6 +1672,7 @@ function sanitizeDraftDocument(draft){
     corretto: !!draft?.corretto,
     results: sanitizeCheckResults(draft?.results),
     meta: sanitizeCheckMeta(draft?.meta),
+    viscosityCorrection: sanitizeViscosityCorrection(draft?.viscosityCorrection),
     createdAtISO: String(draft?.createdAtISO || ""),
     updatedAtISO: String(draft?.updatedAtISO || "")
   });
@@ -2372,6 +2549,7 @@ function getCheckFormState(){
     });
   }
 
+  data.viscosityCorrection = buildViscosityCorrectionPayload(p);
   data.corretto = !!data.meta.aggiunte;
   data.outcome = data.results.some(r=> !r.ok) ? "FUORI_STD" : "OK";
   return data;
@@ -2817,6 +2995,461 @@ function lastModText(check, key){
   return `Modificato il ${fmtDateTime(last.at)} — prima: ${last.old ?? ""} / ora: ${last.new ?? ""}`;
 }
 
+
+/* =========================
+   Viscosity curve / temperature
+========================= */
+const DEFAULT_VISCOSITY_CURVE_POINTS = [
+  { temp:30, cp:700 },
+  { temp:25, cp:850 },
+  { temp:20, cp:1050 }
+];
+let viscosityCurveEditorState = null;
+
+function hasViscosityControl(product){
+  return !!getControlByKey(product?.controls || [], "viscosita");
+}
+function isViscosityCurveEnabled(curve){
+  return !!(curve && curve.enabled && Array.isArray(curve.points) && curve.points.length >= 2);
+}
+function normalizeViscosityCurvePoints(points){
+  return (Array.isArray(points) ? points : [])
+    .map(pt => ({ temp: toNumber(pt?.temp), cp: toNumber(pt?.cp) }))
+    .filter(pt => pt.temp!==null && pt.cp!==null && Number.isFinite(pt.temp) && Number.isFinite(pt.cp) && pt.cp>0)
+    .sort((a,b)=> a.temp-b.temp);
+}
+function hasDuplicateViscosityTemps(points){
+  const seen = new Set();
+  for(const pt of points){
+    const key = String(Number(pt.temp).toFixed(6));
+    if(seen.has(key)) return true;
+    seen.add(key);
+  }
+  return false;
+}
+function solveLinearSystem(matrix, vector){
+  const n = vector.length;
+  const a = matrix.map((row,i)=> row.map(Number).concat(Number(vector[i])));
+  for(let i=0;i<n;i++){
+    let maxRow = i;
+    for(let r=i+1;r<n;r++) if(Math.abs(a[r][i]) > Math.abs(a[maxRow][i])) maxRow = r;
+    if(Math.abs(a[maxRow][i]) < 1e-12) return null;
+    if(maxRow!==i) [a[i], a[maxRow]] = [a[maxRow], a[i]];
+    const pivot = a[i][i];
+    for(let c=i;c<=n;c++) a[i][c] /= pivot;
+    for(let r=0;r<n;r++){
+      if(r===i) continue;
+      const f = a[r][i];
+      for(let c=i;c<=n;c++) a[r][c] -= f*a[i][c];
+    }
+  }
+  return a.map(row=> row[n]);
+}
+function regressionR2(points, predict){
+  const ys = points.map(p=>p.cp);
+  const mean = ys.reduce((a,b)=>a+b,0) / Math.max(1, ys.length);
+  const ssTot = ys.reduce((sum,y)=> sum + Math.pow(y-mean,2), 0);
+  const ssRes = points.reduce((sum,p)=> sum + Math.pow(p.cp - predict(p.temp),2), 0);
+  if(ssTot <= 1e-12) return 1;
+  return Math.max(0, Math.min(1, 1 - ssRes/ssTot));
+}
+function fitViscosityCurve(pointsInput, model="exponential"){
+  const points = normalizeViscosityCurvePoints(pointsInput);
+  if(hasDuplicateViscosityTemps(points)) return { ok:false, message:"Temperature duplicate: elimina o modifica i punti con la stessa temperatura." };
+  const minPoints = model === "quadratic" ? 3 : 2;
+  if(points.length < minPoints) return { ok:false, message:`Servono almeno ${minPoints} punti validi per il modello selezionato.` };
+  try{
+    if(model === "linear"){
+      const n = points.length;
+      const sx = points.reduce((s,p)=>s+p.temp,0);
+      const sy = points.reduce((s,p)=>s+p.cp,0);
+      const sxx = points.reduce((s,p)=>s+p.temp*p.temp,0);
+      const sxy = points.reduce((s,p)=>s+p.temp*p.cp,0);
+      const den = n*sxx - sx*sx;
+      if(Math.abs(den) < 1e-12) return { ok:false, message:"Temperature troppo simili per calcolare la curva." };
+      const b = (n*sxy - sx*sy) / den;
+      const a = (sy - b*sx) / n;
+      const predict = T => a + b*T;
+      return { ok:true, model, points, coefficients:{a,b}, predict, equation:`η = ${a.toFixed(3)} ${b>=0?"+":"-"} ${Math.abs(b).toFixed(3)} · T`, r2:regressionR2(points,predict) };
+    }
+    if(model === "quadratic"){
+      const n = points.length;
+      const sx = points.reduce((s,p)=>s+p.temp,0);
+      const sx2 = points.reduce((s,p)=>s+Math.pow(p.temp,2),0);
+      const sx3 = points.reduce((s,p)=>s+Math.pow(p.temp,3),0);
+      const sx4 = points.reduce((s,p)=>s+Math.pow(p.temp,4),0);
+      const sy = points.reduce((s,p)=>s+p.cp,0);
+      const sxy = points.reduce((s,p)=>s+p.temp*p.cp,0);
+      const sx2y = points.reduce((s,p)=>s+Math.pow(p.temp,2)*p.cp,0);
+      const sol = solveLinearSystem([[n,sx,sx2],[sx,sx2,sx3],[sx2,sx3,sx4]],[sy,sxy,sx2y]);
+      if(!sol) return { ok:false, message:"Impossibile calcolare la curva quadratica con questi punti." };
+      const [a,b,c] = sol;
+      const predict = T => a + b*T + c*T*T;
+      return { ok:true, model, points, coefficients:{a,b,c}, predict, equation:`η = ${a.toFixed(3)} ${b>=0?"+":"-"} ${Math.abs(b).toFixed(3)} · T ${c>=0?"+":"-"} ${Math.abs(c).toFixed(4)} · T²`, r2:regressionR2(points,predict) };
+    }
+    const n = points.length;
+    const sx = points.reduce((s,p)=>s+p.temp,0);
+    const sy = points.reduce((s,p)=>s+Math.log(p.cp),0);
+    const sxx = points.reduce((s,p)=>s+p.temp*p.temp,0);
+    const sxy = points.reduce((s,p)=>s+p.temp*Math.log(p.cp),0);
+    const den = n*sxx - sx*sx;
+    if(Math.abs(den) < 1e-12) return { ok:false, message:"Temperature troppo simili per calcolare la curva." };
+    const b = (n*sxy - sx*sy) / den;
+    const lnA = (sy - b*sx) / n;
+    const A = Math.exp(lnA);
+    const predict = T => A * Math.exp(b*T);
+    return { ok:true, model:"exponential", points, coefficients:{A,b}, predict, equation:`η = ${A.toFixed(3)} · e^(${b.toFixed(5)} · T)`, r2:regressionR2(points,predict) };
+  }catch(err){
+    return { ok:false, message:"Errore calcolo curva: " + (err?.message || err) };
+  }
+}
+function formatR2(v){ return Number.isFinite(v) ? v.toFixed(4) : "—"; }
+function formatCp(v){
+  if(!Number.isFinite(v)) return "—";
+  return Math.round(v).toLocaleString("it-IT");
+}
+function isTempOutsideCurveRange(temp, points){
+  const valid = normalizeViscosityCurvePoints(points);
+  if(valid.length<2 || temp===null || !Number.isFinite(temp)) return false;
+  return temp < valid[0].temp || temp > valid[valid.length-1].temp;
+}
+function drawViscosityCurveCanvas(canvas, fit, options={}){
+  if(!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width || 760, h = canvas.height || 320;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle = "#e5e7eb";
+  ctx.lineWidth = 1;
+  const pad = {l:54,r:20,t:20,b:42};
+  const points = fit?.points || normalizeViscosityCurvePoints(options.points || []);
+  if(points.length===0){
+    ctx.fillStyle = "#64748b"; ctx.font = "14px system-ui"; ctx.fillText("Inserisci punti validi per vedere il grafico.", 24, 42); return;
+  }
+  const temps = points.map(p=>p.temp);
+  let minT = Math.min(...temps), maxT = Math.max(...temps);
+  if(minT===maxT){ minT-=1; maxT+=1; }
+  const marginT = Math.max(1, (maxT-minT)*0.12);
+  minT -= marginT; maxT += marginT;
+  const sampleTemps = [];
+  for(let i=0;i<=80;i++) sampleTemps.push(minT + (maxT-minT)*i/80);
+  const sampleYs = fit?.ok ? sampleTemps.map(T=>fit.predict(T)).filter(Number.isFinite) : [];
+  const cps = points.map(p=>p.cp).concat(sampleYs);
+  let minY = Math.min(...cps), maxY = Math.max(...cps);
+  if(minY===maxY){ minY*=0.9; maxY*=1.1; }
+  const marginY = Math.max(5, (maxY-minY)*0.12);
+  minY = Math.max(0, minY-marginY); maxY += marginY;
+  const x = T => pad.l + (T-minT)/(maxT-minT)*(w-pad.l-pad.r);
+  const y = cp => pad.t + (maxY-cp)/(maxY-minY)*(h-pad.t-pad.b);
+  for(let i=0;i<=4;i++){
+    const yy = pad.t + (h-pad.t-pad.b)*i/4;
+    ctx.beginPath(); ctx.moveTo(pad.l,yy); ctx.lineTo(w-pad.r,yy); ctx.stroke();
+    const val = maxY - (maxY-minY)*i/4;
+    ctx.fillStyle="#64748b"; ctx.font="11px system-ui"; ctx.fillText(Math.round(val), 8, yy+4);
+  }
+  ctx.strokeStyle="#94a3b8"; ctx.beginPath(); ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,h-pad.b); ctx.lineTo(w-pad.r,h-pad.b); ctx.stroke();
+  ctx.fillStyle="#64748b"; ctx.font="12px system-ui"; ctx.fillText("°C", w-pad.r-10, h-12); ctx.fillText("cP", 18, 16);
+  if(fit?.ok){
+    ctx.strokeStyle="#0ea5e9"; ctx.lineWidth=3; ctx.beginPath();
+    sampleTemps.forEach((T,i)=>{ const yy = y(fit.predict(T)); if(i===0) ctx.moveTo(x(T),yy); else ctx.lineTo(x(T),yy); });
+    ctx.stroke();
+  }
+  for(const marker of (options.markers || [])){
+    if(marker?.temp==null || !Number.isFinite(marker.temp)) continue;
+    const xx = x(marker.temp);
+    ctx.strokeStyle = marker.color || "#111827"; ctx.lineWidth=1.5; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(xx,pad.t); ctx.lineTo(xx,h-pad.b); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = marker.color || "#111827"; ctx.font="12px system-ui"; ctx.fillText(marker.label || `${marker.temp}°C`, Math.min(xx+4,w-88), pad.t+14);
+  }
+  points.forEach(pt=>{
+    ctx.fillStyle="#111827"; ctx.beginPath(); ctx.arc(x(pt.temp), y(pt.cp), 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="#334155"; ctx.font="11px system-ui"; ctx.fillText(`${pt.temp}°C`, x(pt.temp)+7, y(pt.cp)-7);
+  });
+}
+function getCurrentViscosityCurveEditorPoints(){
+  return [...document.querySelectorAll("#viscCurvePointsBody tr")].map(tr=>({
+    temp: toNumber(tr.querySelector('input[data-vcurve="temp"]')?.value),
+    cp: toNumber(tr.querySelector('input[data-vcurve="cp"]')?.value)
+  }));
+}
+function renderViscosityCurveEditorRows(points){
+  const body = document.getElementById("viscCurvePointsBody");
+  if(!body) return;
+  body.innerHTML = "";
+  (points || []).forEach((pt, idx)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input data-vcurve="temp" type="number" step="any" value="${esc(pt.temp ?? "")}" aria-label="Temperatura punto ${idx+1}" /></td>
+      <td><input data-vcurve="cp" type="number" step="any" min="0" value="${esc(pt.cp ?? "")}" aria-label="Viscosità punto ${idx+1}" /></td>
+      <td class="right"><button class="smallbtn danger" data-vcurve-delete="${idx}">Elimina</button></td>
+    `;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll("input[data-vcurve]").forEach(inp=> inp.addEventListener("input", updateViscosityCurveEditorPreview));
+  body.querySelectorAll("button[data-vcurve-delete]").forEach(btn=> btn.addEventListener("click", ()=>{
+    const idx = Number(btn.getAttribute("data-vcurve-delete"));
+    const pts = getCurrentViscosityCurveEditorPoints();
+    pts.splice(idx,1);
+    renderViscosityCurveEditorRows(pts);
+    updateViscosityCurveEditorPreview();
+  }));
+}
+function updateViscosityCurveEditorPreview(){
+  const model = document.getElementById("viscCurveModel")?.value || "exponential";
+  const points = getCurrentViscosityCurveEditorPoints();
+  const fit = fitViscosityCurve(points, model);
+  const eq = document.getElementById("viscCurveEquation");
+  const r2 = document.getElementById("viscCurveR2");
+  const msg = document.getElementById("viscCurveMessage");
+  if(eq) eq.textContent = fit.ok ? fit.equation : "—";
+  if(r2) r2.textContent = fit.ok ? formatR2(fit.r2) : "—";
+  if(msg) msg.innerHTML = fit.ok ? `<span class="tag ok">Curva valida</span>` : `<span class="viscCurveWarn">${esc(fit.message || "Curva non valida.")}</span>`;
+  drawViscosityCurveCanvas(document.getElementById("viscCurveCanvas"), fit.ok ? fit : null, { points });
+  return fit;
+}
+function openViscosityCurveModal(){
+  const p = cachedProduct;
+  if(!p) return;
+  viscosityCurveEditorState = { code:p.code };
+  document.getElementById("viscCurveProductCode").textContent = p.code;
+  const saved = p.viscosityCurve || null;
+  document.getElementById("viscCurveModel").value = saved?.model || "exponential";
+  renderViscosityCurveEditorRows((Array.isArray(saved?.points) && saved.points.length) ? deepClone(saved.points) : deepClone(DEFAULT_VISCOSITY_CURVE_POINTS));
+  updateViscosityCurveEditorPreview();
+  const ov = document.getElementById("viscosityCurveOverlay");
+  ov?.classList.remove("hide");
+  ov?.setAttribute("aria-hidden", "false");
+}
+function closeViscosityCurveModal(){
+  const ov = document.getElementById("viscosityCurveOverlay");
+  ov?.classList.add("hide");
+  ov?.setAttribute("aria-hidden", "true");
+}
+async function saveViscosityCurve(){
+  const p = cachedProduct;
+  if(!p) return;
+  const model = document.getElementById("viscCurveModel")?.value || "exponential";
+  const rawPoints = getCurrentViscosityCurveEditorPoints();
+  if(rawPoints.some(pt => pt.temp===null || pt.cp===null)) return alert("Completa temperatura e viscosità per ogni riga oppure elimina le righe vuote.");
+  if(rawPoints.some(pt => pt.cp<=0)) return alert("Le viscosità devono essere maggiori di zero.");
+  if(hasDuplicateViscosityTemps(rawPoints)) return alert("Temperature duplicate: elimina o modifica i punti con la stessa temperatura.");
+  const fit = fitViscosityCurve(rawPoints, model);
+  if(!fit.ok) return alert(fit.message || "Curva non valida.");
+  p.viscosityCurve = {
+    enabled: true,
+    model: fit.model,
+    points: fit.points.map(pt=>({ temp:Number(pt.temp), cp:Number(pt.cp) })),
+    equation: fit.equation,
+    r2: Number(fit.r2.toFixed(6)),
+    updatedAt: new Date().toISOString(),
+    updatedBy: "Registro Controlli VivColor"
+  };
+  await put(tx([STORES.products], "readwrite").objectStore(STORES.products), p);
+  cachedProduct = p;
+  renderProductViscosityCurvePanel(p);
+  closeViscosityCurveModal();
+}
+function renderProductViscosityCurvePanel(product){
+  const panel = document.getElementById("productViscosityCurvePanel");
+  const status = document.getElementById("productViscosityCurveStatus");
+  if(!panel || !status) return;
+  const viscCtrl = getControlByKey(product?.controls || [], "viscosita");
+  panel.classList.toggle("hide", !viscCtrl);
+  if(!viscCtrl) return;
+  const curve = product?.viscosityCurve;
+  if(isViscosityCurveEnabled(curve)){
+    status.textContent = `${curve.model || "exponential"} • ${curve.points.length} punti • R² ${formatR2(Number(curve.r2))}`;
+  }else{
+    status.textContent = "Curva non impostata. Il prodotto resta utilizzabile normalmente.";
+  }
+}
+function hasAppliedViscosityCorrection(){
+  return !!(activeViscosityCorrection && activeViscosityCorrection.used === true);
+}
+function getViscosityInput(){
+  return document.querySelector('#checkRows input[data-val="viscosita"]');
+}
+function getViscosityCorrectionInputs(){
+  return {
+    measuredCp: document.getElementById("viscCorrMeasuredCp"),
+    measuredTemp: document.getElementById("viscCorrMeasuredTemp"),
+    targetTemp: document.getElementById("viscCorrTargetTemp")
+  };
+}
+function buildViscosityCorrectionButtonHtml(product){
+  const hasCurve = isViscosityCurveEnabled(product?.viscosityCurve);
+  const cls = hasCurve ? "secondary" : "viscTempBtnMissing";
+  const title = hasCurve
+    ? "Calcola la viscosità corretta usando la curva del prodotto"
+    : "Curva viscosità non impostata: clicca per dettagli";
+  return `<button type="button" class="smallbtn ${cls}" data-open-visc-corr="1" title="${esc(title)}">Correzione temperatura</button>`;
+}
+function calculateViscosityCorrectionFromValues(product, measuredCp, measuredTemp, targetTemp){
+  const curve = product?.viscosityCurve;
+  if(!isViscosityCurveEnabled(curve)) return { ok:false, message:"Curva viscosità non impostata per questo prodotto." };
+  const fit = fitViscosityCurve(curve.points, curve.model || "exponential");
+  if(!fit.ok) return { ok:false, fit, message:fit.message || "Curva viscosità non valida." };
+  if(measuredCp===null || !Number.isFinite(measuredCp) || measuredCp<=0) return { ok:false, fit, message:"Inserisci una viscosità misurata maggiore di zero." };
+  if(measuredTemp===null || !Number.isFinite(measuredTemp)) return { ok:false, fit, message:"Inserisci la temperatura reale di misura." };
+  if(targetTemp===null || !Number.isFinite(targetTemp)) return { ok:false, fit, message:"Inserisci la temperatura target." };
+  const etaMeasured = fit.predict(measuredTemp);
+  const etaTarget = fit.predict(targetTemp);
+  if(!Number.isFinite(etaMeasured) || etaMeasured<=0 || !Number.isFinite(etaTarget) || etaTarget<=0){
+    return { ok:false, fit, message:"Impossibile calcolare la correzione con questi valori." };
+  }
+  const correctedCp = measuredCp * etaTarget / etaMeasured;
+  const extrapolated = isTempOutsideCurveRange(measuredTemp, fit.points) || isTempOutsideCurveRange(targetTemp, fit.points);
+  return { ok:true, fit, measuredCp, measuredTemp, targetTemp, correctedCp, etaMeasured, etaTarget, extrapolated };
+}
+function buildViscosityCorrectionPayloadFromCalc(product, calc){
+  if(!calc?.ok) return null;
+  const curve = product?.viscosityCurve || {};
+  return {
+    used: true,
+    measuredCp: Number(calc.measuredCp),
+    measuredTemp: Number(calc.measuredTemp),
+    targetTemp: Number(calc.targetTemp),
+    correctedCp: Number(calc.correctedCp.toFixed(3)),
+    modelUsed: curve.model || "exponential",
+    extrapolated: !!calc.extrapolated,
+    curveSnapshot: {
+      points: normalizeViscosityCurvePoints(curve.points).map(pt=>({ temp:Number(pt.temp), cp:Number(pt.cp) })),
+      equation: String(curve.equation || calc.fit.equation || ""),
+      r2: Number(curve.r2 ?? calc.fit.r2 ?? 0)
+    }
+  };
+}
+function calculateCurrentViscosityCorrection(product){
+  const { measuredCp, measuredTemp, targetTemp } = getViscosityCorrectionInputs();
+  return calculateViscosityCorrectionFromValues(
+    product,
+    toNumber(measuredCp?.value),
+    toNumber(measuredTemp?.value),
+    toNumber(targetTemp?.value)
+  );
+}
+function updateViscosityCorrectionPreview(product){
+  const resEl = document.getElementById("viscCorrResult");
+  if(!resEl) return;
+  const formulaEl = document.getElementById("viscCorrFormula");
+  const warnEl = document.getElementById("viscCorrWarn");
+  const calc = calculateCurrentViscosityCorrection(product);
+  if(!calc?.ok){
+    resEl.textContent = "—";
+    if(formulaEl) formulaEl.textContent = calc?.message || "Inserisci viscosità misurata e temperature.";
+    if(warnEl) warnEl.innerHTML = "";
+    drawViscosityCurveCanvas(document.getElementById("viscCorrCanvas"), calc?.fit?.ok ? calc.fit : null, { points: product?.viscosityCurve?.points || [] });
+    return;
+  }
+  resEl.textContent = `${formatCp(calc.correctedCp)} cP a ${calc.targetTemp} °C`;
+  if(formulaEl) formulaEl.textContent = `Valore misurato: ${formatCp(calc.measuredCp)} cP a ${calc.measuredTemp} °C • η target / η misura = ${calc.etaTarget.toFixed(1)} / ${calc.etaMeasured.toFixed(1)}`;
+  if(warnEl) warnEl.innerHTML = calc.extrapolated ? `<div class="viscCurveWarn">Attenzione: il valore è fuori dal range della curva, quindi il risultato è un'extrapolazione.</div>` : "";
+  drawViscosityCurveCanvas(document.getElementById("viscCorrCanvas"), calc.fit, { markers:[{temp:calc.measuredTemp,label:"Misura",color:"#f97316"},{temp:calc.targetTemp,label:"Target",color:"#16a34a"}] });
+}
+function openViscosityCorrectionModal(){
+  const p = cachedProduct;
+  if(!p) return;
+  const overlay = document.getElementById("viscosityCorrectionOverlay");
+  const missingBox = document.getElementById("viscCorrMissingBox");
+  const content = document.getElementById("viscCorrContent");
+  const useBtn = document.getElementById("viscCorrUseBtn");
+  document.getElementById("viscCorrProductCode").textContent = p.code || "—";
+
+  const curve = p.viscosityCurve || null;
+  const hasCurve = isViscosityCurveEnabled(curve);
+  missingBox?.classList.toggle("hide", hasCurve);
+  content?.classList.toggle("hide", !hasCurve);
+  if(useBtn) useBtn.classList.toggle("hide", !hasCurve);
+
+  overlay?.classList.remove("hide");
+  overlay?.setAttribute("aria-hidden", "false");
+
+  if(!hasCurve){
+    if(missingBox){
+      missingBox.innerHTML = `<b>Curva viscosità non impostata per questo prodotto.</b><div style="margin-top:6px">Puoi inserire la viscosità manualmente. Imposta la curva dal dettaglio prodotto per usare la correzione automatica.</div>`;
+    }
+    return;
+  }
+
+  const fit = fitViscosityCurve(curve.points, curve.model || "exponential");
+  document.getElementById("viscCorrModel").textContent = curve.model || "exponential";
+  document.getElementById("viscCorrEquation").textContent = curve.equation || fit.equation || "—";
+  document.getElementById("viscCorrR2").textContent = formatR2(Number(curve.r2 ?? fit.r2));
+
+  const viscValue = toNumber(getViscosityInput()?.value);
+  const { measuredCp, measuredTemp, targetTemp } = getViscosityCorrectionInputs();
+  if(measuredCp) measuredCp.value = activeViscosityCorrection?.measuredCp ?? (viscValue ?? "");
+  if(measuredTemp) measuredTemp.value = activeViscosityCorrection?.measuredTemp ?? "";
+  if(targetTemp) targetTemp.value = activeViscosityCorrection?.targetTemp ?? "20";
+  updateViscosityCorrectionPreview(p);
+}
+function closeViscosityCorrectionModal(){
+  const overlay = document.getElementById("viscosityCorrectionOverlay");
+  overlay?.classList.add("hide");
+  overlay?.setAttribute("aria-hidden", "true");
+}
+function buildViscosityCorrectionNote(corr){
+  return `Viscosità calcolata: valore misurato ${formatCp(corr.measuredCp)} cP a ${corr.measuredTemp} °C, riportato a ${corr.targetTemp} °C = ${formatCp(corr.correctedCp)} cP tramite curva viscosità/temperatura del prodotto.`;
+}
+function filterViscosityCorrectionNoteLines(text){
+  return String(text || "")
+    .split("\n")
+    .filter(line => !/^Viscosità calcolata: valore misurato .* tramite curva viscosità\/temperatura del prodotto\.$/.test(line.trim()));
+}
+function removeViscosityCorrectionNote(){
+  const noteEl = document.getElementById("checkNote");
+  if(!noteEl) return;
+  noteEl.value = filterViscosityCorrectionNoteLines(noteEl.value).join("\n").trimEnd();
+}
+function upsertViscosityCorrectionNote(corr){
+  const noteEl = document.getElementById("checkNote");
+  if(!noteEl || !corr) return;
+  const nextLine = buildViscosityCorrectionNote(corr);
+  const lines = filterViscosityCorrectionNoteLines(noteEl.value);
+  while(lines.length && lines[lines.length-1].trim()==="") lines.pop();
+  lines.push(nextLine);
+  noteEl.value = lines.join("\n");
+}
+function applyViscosityCorrection(){
+  const p = cachedProduct;
+  if(!p) return;
+  const calc = calculateCurrentViscosityCorrection(p);
+  if(!calc?.ok) return alert(calc?.message || "Impossibile calcolare la viscosità corretta.");
+  const payload = buildViscosityCorrectionPayloadFromCalc(p, calc);
+  activeViscosityCorrection = payload;
+  const inp = getViscosityInput();
+  if(inp){
+    inp.value = String(Math.round(calc.correctedCp));
+    inp.dataset.viscProgrammatic = "1";
+    inp.dispatchEvent(new Event("input", { bubbles:true }));
+    delete inp.dataset.viscProgrammatic;
+  }
+  upsertViscosityCorrectionNote(payload);
+  closeViscosityCorrectionModal();
+  alert("Valore riportato nel controllo viscosità e nota aggiunta.");
+}
+function buildViscosityCorrectionPayload(){
+  return hasAppliedViscosityCorrection() ? deepClone(activeViscosityCorrection) : null;
+}
+function sanitizeViscosityCorrection(corr){
+  if(!corr) return null;
+  return toFirestoreSafe({
+    used: corr.used === true || corr.correctedCp != null,
+    measuredCp: (corr.measuredCp==null ? null : Number(corr.measuredCp)),
+    measuredTemp: (corr.measuredTemp==null ? null : Number(corr.measuredTemp)),
+    targetTemp: (corr.targetTemp==null ? null : Number(corr.targetTemp)),
+    correctedCp: (corr.correctedCp==null ? null : Number(corr.correctedCp)),
+    modelUsed: String(corr.modelUsed || ""),
+    extrapolated: !!corr.extrapolated,
+    curveSnapshot: {
+      points: normalizeViscosityCurvePoints(corr.curveSnapshot?.points).map(pt=>({ temp:Number(pt.temp), cp:Number(pt.cp) })),
+      equation: String(corr.curveSnapshot?.equation || ""),
+      r2: Number(corr.curveSnapshot?.r2 ?? 0)
+    }
+  });
+}
+
 /* =========================
    Render product
 ========================= */
@@ -2946,6 +3579,7 @@ async function loadProduct(rawCode){
   document.getElementById("noteText").textContent = p.noteOperative ?? "";
 
   renderStdTable(p.controls || []);
+  renderProductViscosityCurvePanel(p);
 
   const checks = await getChecks(code);
   renderLastChecks5(p, checks);
@@ -3235,6 +3869,7 @@ async function startNewCheck(draft=null){
   document.getElementById("checkNote").value = draft?.meta?.note || "";
   document.getElementById("checkProdottoDa").value = draft?.meta?.prodottoDa || "";
   document.getElementById("checkEffettuatoDa").value = draft?.meta?.effettuatoDa || "";
+  activeViscosityCorrection = draft?.viscosityCorrection ? { used:true, ...deepClone(draft.viscosityCorrection) } : null;
 
   const container = document.getElementById("checkRows");
   container.innerHTML = "";
@@ -3291,7 +3926,10 @@ async function startNewCheck(draft=null){
       ${extraLine}
       <div class="row2" style="margin-top:10px">
         <div>
-          <label for="check-val-${esc(c.key)}">Valore</label>
+          <div class="topline" style="align-items:flex-end; gap:8px">
+            <label for="check-val-${esc(c.key)}" style="margin-bottom:6px">Valore</label>
+            ${c.key==="viscosita" ? buildViscosityCorrectionButtonHtml(p) : ""}
+          </div>
           <input id="check-val-${esc(c.key)}" data-val="${esc(c.key)}" type="number" step="any" placeholder="Inserisci valore..." value="${draftVal===null || draftVal===undefined ? "" : esc(String(draftVal))}" />
         </div>
         <div>
@@ -3309,10 +3947,20 @@ async function startNewCheck(draft=null){
 
     inp.addEventListener("input", ()=>{
       const v = toNumber(inp.value);
+      if(c.key==="viscosita" && inp.dataset.viscProgrammatic!=="1" && activeViscosityCorrection){
+        const corrected = Number(activeViscosityCorrection.correctedCp);
+        if(v===null || Math.round(corrected)!==Math.round(v)){
+          activeViscosityCorrection = null;
+          removeViscosityCorrectionNote();
+        }
+      }
       if(v===null){ out.value="—"; return; }
       const ok = evaluateValueAgainstSpec(c, v);
       out.value = ok ? "OK" : "Fuori STD";
     });
+    if(c.key==="viscosita"){
+      card.querySelector('button[data-open-visc-corr="1"]')?.addEventListener("click", openViscosityCorrectionModal);
+    }
   }
 
   if(!anyShown){
@@ -3398,6 +4046,7 @@ async function saveCheckDraft(options={}){
       corretto: state.corretto,
       results: state.results,
       meta: state.meta,
+      viscosityCorrection: state.viscosityCorrection,
       createdAtISO,
       updatedAtISO: new Date().toISOString()
     });
@@ -3611,6 +4260,7 @@ async function saveCheck(){
       corretto,
       results: resultsSan,
       meta,
+      viscosityCorrection: buildViscosityCorrectionPayload(),
       modifications: {}
     };
 
@@ -4401,6 +5051,23 @@ on("saveNewProdBtn","click",async ()=> withButtonLoading("saveNewProdBtn", ()=>s
 
 on("editSetupBtn","click",openSetup);
 on("setupBackBtn","click",async ()=> loadProduct(currentCode));
+on("openViscosityCurveBtn","click",openViscosityCurveModal);
+on("viscCurveCloseBtn","click",closeViscosityCurveModal);
+on("viscCurveAddPointBtn","click",()=>{
+  const pts = getCurrentViscosityCurveEditorPoints();
+  pts.push({ temp:"", cp:"" });
+  renderViscosityCurveEditorRows(pts);
+  updateViscosityCurveEditorPreview();
+});
+on("viscCurveModel","change",updateViscosityCurveEditorPreview);
+on("viscCurveSaveBtn","click",async ()=> withButtonLoading("viscCurveSaveBtn", ()=>saveViscosityCurve(), {
+  loadingText:"Salvataggio…", loadingStatus:"DB: salvataggio curva…", errorStatus:"DB: errore curva"
+}));
+on("viscCorrCloseBtn","click",closeViscosityCorrectionModal);
+on("viscCorrUseBtn","click",applyViscosityCorrection);
+on("viscCorrMeasuredCp","input",()=> updateViscosityCorrectionPreview(cachedProduct));
+on("viscCorrMeasuredTemp","input",()=> updateViscosityCorrectionPreview(cachedProduct));
+on("viscCorrTargetTemp","input",()=> updateViscosityCorrectionPreview(cachedProduct));
 on("setupSaveBtn","click",async ()=> withButtonLoading("setupSaveBtn", ()=>saveSetup(), {
   loadingText:"Salvataggio...",
   loadingStatus:"DB: salvataggio setup prodotto…",
