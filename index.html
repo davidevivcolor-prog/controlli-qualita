@@ -380,6 +380,8 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
 #viewHome .controlCard{ background:linear-gradient(180deg,#fff 0%, #fcfdff 100%); }
 .title{ letter-spacing:.1px; }
 
+label.lottoLabel{color:#991b1b;font-size:16px;font-weight:900;letter-spacing:.5px;}
+#checkLotto, #detailLotto{border:2px solid #b45353;}
 </style>
 </head>
 
@@ -853,7 +855,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             <input id="checkDate" type="datetime-local" disabled />
           </div>
           <div>
-            <label for="checkLotto">Lotto (obbligatorio)</label>
+            <label for="checkLotto" class="lottoLabel">LOTTO (obbligatorio)</label>
             <input id="checkLotto" placeholder="Inserisci lotto..." />
           </div>
         </div>
@@ -981,7 +983,7 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
             <input id="detailDate" type="datetime-local" disabled />
           </div>
           <div>
-            <label for="detailLotto">Lotto</label>
+            <label for="detailLotto" class="lottoLabel">LOTTO</label>
             <input id="detailLotto" />
           </div>
         </div>
@@ -1036,7 +1038,9 @@ input, select, textarea{ transition:border-color .14s ease, box-shadow .14s ease
           </div>
         </div>
 
-        <div id="operatorsRoleChooser" style="margin-top:12px">
+        <div class="noteBox">Per riunire i controlli registrati con i due cognomi di Fernando, usa il pulsante qui sotto. Prima del salvataggio vedrai i conteggi effettivi.</div>
+<button id="mergeFernandoBtn" class="secondary" type="button">Unisci Saramento / Sarmento Fernando</button>
+<div id="operatorsRoleChooser" style="margin-top:12px">
           <div class="muted">Seleziona una sezione</div>
           <div class="operatorRoleGrid">
             <button class="operatorRoleCard" id="openProduzioneSection" type="button">
@@ -1468,7 +1472,7 @@ import {
   startAfter,
   getCountFromServer,
   updateDoc,
-  increment
+  increment, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
 
 
@@ -1609,6 +1613,7 @@ function toFirestoreSafe(input){
 }
 
 function sanitizeCheckMeta(meta){
+  meta = {...meta, prodottoDa:canonicalOperatorName(meta?.prodottoDa), effettuatoDa:canonicalOperatorName(meta?.effettuatoDa)};
   return {
     viscositaNote: String(meta?.viscositaNote || ""),
     aggiunte: String(meta?.aggiunte || ""),
@@ -3994,6 +3999,7 @@ function toLocalDatetimeInput(iso){
 }
 
 async function saveCheckDraft(options={}){
+  await ensureOperatorsSynced();
   const p = cachedProduct;
   if(!p) return false;
   if(isCheckSaving) return false;
@@ -4153,6 +4159,7 @@ async function confirmDuplicateLottoIfNeeded(lotto, ignoreCheckId=null){
 }
 
 async function saveCheck(){
+  await syncOperatorsFromCloud();
   const p = cachedProduct;
   if(!p) return;
   if(isCheckSaving) return;
@@ -4186,6 +4193,8 @@ async function saveCheck(){
       effettuatoDa: document.getElementById("checkEffettuatoDa").value.trim()
     };
 
+    meta.prodottoDa=canonicalOperatorName(meta.prodottoDa);
+    meta.effettuatoDa=canonicalOperatorName(meta.effettuatoDa);
     const results = [];
     let anyOut = false;
     const missingControls = [];
@@ -4782,6 +4791,7 @@ async function generateCoAPdf(){
 }
 
 async function saveDetail(){
+  await syncOperatorsFromCloud();
   if(!detailCheck) return;
 
   const lotto = String(detailCheck.lotto ?? "").trim().toUpperCase();
@@ -5099,43 +5109,9 @@ on("backToOperatorsBtn","click",()=>{ renderOperatorsList(selectedOperatorsRole)
 
 on("cancelEditOperatorBtn","click",()=>{ resetOperatorForm(); });
 
-on("saveOperatorBtn","click",async ()=>{
-  const role = (document.getElementById("operatorRole").value||"").trim();
-  const name = (document.getElementById("opName").value||"").trim();
-  const surname = (document.getElementById("opSurname").value||"").trim();
-  const code = (document.getElementById("opCode").value||"").trim();
-  const editId = (document.getElementById("opEditId").value||"").trim();
-
-  if(!role || !name || !surname || !code) return alert("Compila ruolo, nome, cognome e sigla.");
-
-  const list = ensureOperatorIds(loadOperators());
-
-  // blocco duplicati: stessa sigla + cognome + nome (case-insensitive), ma permette quello in modifica
-  const formatted = formatOperator({role,name,surname,code});
-  const exists = list.some(o=> (o.id!==editId) && normOp(formatOperator(o))===normOp(formatted));
-  if(exists) return alert("Operatore già presente.");
-
-  if(editId){
-    const idx = list.findIndex(o=>o.id===editId);
-    if(idx<0) return alert("Operatore non trovato (forse cancellato).");
-    list[idx] = { ...list[idx], role, name, surname, code };
-    saveOperators(list);
-    try{ await upsertOperatorCloud(list[idx]); }catch(_){ }
-    renderOperatorsList();
-    resetOperatorForm();
-    alert("Operatore aggiornato ✅");
-  } else {
-    list.push({ id: genId(), role, name, surname, code });
-    saveOperators(list);
-    try{ await upsertOperatorCloud(list[idx]); }catch(_){ }
-    renderOperatorsList();
-    resetOperatorForm();
-    alert("Operatore salvato ✅");
-  }
-
-  // aggiorna anche i picker nei controlli
-  try{ renderOperatorPickers(); }catch(_){}
-});
+on("saveOperatorBtn","click",()=> withButtonLoading("saveOperatorBtn", saveOperatorWithHistory, {loadingText:"Aggiornamento…"}));
+on("mergeFernandoBtn","click",()=> withButtonLoading("mergeFernandoBtn", mergeFernandoOperators, {loadingText:"Unione in corso…"}));
+on("cancelEditOperatorBtn","click",resetOperatorForm);
 
 on("cancelCheckBtn","click",async ()=> loadProduct(currentCode));
 on("saveDraftBtn","click",async ()=> withButtonLoading("saveDraftBtn", ()=>saveCheckDraft(), {
@@ -5347,13 +5323,15 @@ async function upsertOperatorCloud(op){
     code: op.code || "",
     surname: op.surname || "",
     name: op.name || "",
+    aliases: op.aliases || [],
+    deleted: false,
     updatedAt: new Date().toISOString()
   };
   await setDoc(doc(fs, COL_OPERATORS, op.id), payload, { merge:true });
 }
 async function deleteOperatorCloud(id){
   if(!id) return;
-  await deleteDoc(doc(fs, COL_OPERATORS, id));
+  await setDoc(doc(fs, COL_OPERATORS, id), {deleted:true, updatedAt:new Date().toISOString()}, {merge:true});
 }
 
 // merge: cloud wins if has newer updatedAt, else local
@@ -5374,39 +5352,14 @@ function mergeOperators(localList, cloudList){
 }
 
 async function syncOperatorsFromCloud(){
-  // Carica local
-  const local = Array.isArray(loadOperatorsLocal()) ? loadOperatorsLocal() : [];
-  // Prova a prendere cloud e normalizzare/deduplicare
-  let cloud = [];
-  try{ cloud = await fetchOperatorsCloud(); }catch(_){ cloud = []; }
-
-  const merged = normalizeOperators(local, cloud);
-
-  // Salva local
-  cachedOperators = merged;
-  saveOperatorsLocal(merged);
-
-  // Allinea cloud: upsert sugli id stabili + elimina vecchi duplicati (docId diversi ma stessa chiave)
-  try{
-    const wantIds = new Set();
-    for(const op of merged){
-      wantIds.add(op.id);
-      try{ await upsertOperatorCloud(op); }catch(_){}
-    }
-    // elimina doc cloud con id non stabile (vecchi duplicati)
-    for(const c of (cloud||[])){
-      const stableId = stableOpId(c);
-      if(c._docId && c._docId !== stableId){
-        try{ await deleteOperatorCloud(c._docId); }catch(_){}
-      }
-    }
-  }catch(err){
-    console.warn("Sync operatori cloud fallita:", err);
-  }
-
-  try{ renderOperatorsList(); }catch(_){}
-  try{ renderOperatorPickers(); }catch(_){}
+  // Il cloud ha precedenza; le copie locali non riscrivono automaticamente l'anagrafica.
+  const cloud = await fetchOperatorsCloud();
+  cachedOperators = normalizeOperators(loadOperatorsLocal(), cloud);
+  saveOperatorsLocal(cachedOperators);
+  renderOperatorsList(selectedOperatorsRole);
+  renderOperatorPickers();
 }
+
 function ensureOperatorsSynced(){
   if(!operatorsSyncPromise){
     operatorsSyncPromise = syncOperatorsFromCloud()
@@ -5436,6 +5389,7 @@ function opKey(o){
   return [role, code, surname, name].filter(Boolean).join("__");
 }
 function stableOpId(o){
+  if(o?.id) return o.id;
   const k = opKey(o);
   return "op_" + (k || genId());
 }
@@ -5445,24 +5399,14 @@ function pickNewest(a,b){
   return (bt >= at) ? b : a;
 }
 function normalizeOperators(localList, cloudList){
-  const all = []
-    .concat(Array.isArray(localList)?localList:[])
-    .concat(Array.isArray(cloudList)?cloudList:[]);
-  const byStable = new Map();
-  for(const raw of all){
-    if(!raw) continue;
-    const op = {
-      id: stableOpId(raw),
-      role: raw.role || "",
-      code: raw.code || "",
-      surname: raw.surname || "",
-      name: raw.name || "",
-      updatedAt: raw.updatedAt || "",
-    };
-    const cur = byStable.get(op.id);
-    byStable.set(op.id, cur ? pickNewest(cur, op) : op);
+  const byId = new Map();
+  for(const raw of [...(localList||[]), ...(cloudList||[])]){
+    if(raw) byId.set(stableOpId(raw), {...raw, id:stableOpId(raw)});
   }
-  return Array.from(byStable.values());
+  const all = [...byId.values()];
+  return all.filter(o=>!o.deleted && !all.some(target=>
+    !target.deleted && target.id!==o.id && (target.aliases||[]).some(a=>normOp(a)===normOp(formatOperator(o)))
+  ));
 }
 
 function ensureOperatorIds(list){
@@ -5596,7 +5540,7 @@ function startEditOperator(op){
 }
 
 async function openOperatorHistory(opId){
-  const ops = ensureOperatorIds(loadOperators()).filter(o=> !roleFilter || (o.role||"").toLowerCase()===roleFilter);
+  const ops = ensureOperatorIds(loadOperators());
   const op = ops.find(o=>o.id===opId);
   if(!op) return alert("Operatore non trovato.");
   await renderOperatorHistory(op);
@@ -5741,7 +5685,7 @@ async function renderOperatorHistory(op){
   renderList();
 }
 
-function renderOperatorsList(roleFilter=null){
+function renderOperatorsList(roleFilter=selectedOperatorsRole){
   const wrap = document.getElementById("operatorsList");
   if(!wrap) return;
   const ops = ensureOperatorIds(loadOperators()).filter(o=> !roleFilter || (o.role||"").toLowerCase()===roleFilter);
@@ -5793,7 +5737,7 @@ function renderOperatorsList(roleFilter=null){
       const victim = ops.find(x=>x.id===id);
       const sid = victim ? stableOpId(victim) : id;
       const dupIds = ops.filter(x=>stableOpId(x)===sid).map(x=>x.id);
-      const next = ops.filter(x=>stableOpId(x)!==sid);
+      const next = loadOperators().filter(x=>stableOpId(x)!==sid);
       saveOperators(next);
       for(const did of dupIds){ try{ await deleteOperatorCloud(did); }catch(_){ } }
       renderOperatorsList();
@@ -5850,6 +5794,138 @@ function renderOperatorPickers(){
   if(qcInput) qcInput.oninput = refresh;
 
   refresh();
+}
+
+// Identità operatore: l'ID rimane invariato quando cambiano nome e cognome.
+function operatorNames(op){
+  return [...new Set([formatOperator(op), `${op.surname||""} ${op.name||""}`.trim(), ...(op.aliases||[])].filter(Boolean))];
+}
+function operatorRenamePlan(sources, target){
+  const labels = new Set(sources.flatMap(operatorNames).map(normOp));
+  const destination = formatOperator(target);
+  const rewrite = value => labels.has(normOp(value)) ? destination : value;
+  return {rewrite, destination};
+}
+function operatorDocumentPatch(data, kind, plan){
+  const patch = {};
+  const paths = kind===COL_PRODUCTS ? ["stats.lastByProd","stats.lastByQc"] : ["meta.prodottoDa","meta.effettuatoDa"];
+  for(const path of paths){
+    const [parent,key] = path.split('.');
+    const old = data?.[parent]?.[key];
+    const next = plan.rewrite(old);
+    if(old!==next) patch[path] = next;
+  }
+  return patch;
+}
+async function loadOperatorMigrationData(){
+  const collections = [COL_CHECKS,COL_DRAFTS,COL_PRODUCTS];
+  const snapshots = await Promise.all(collections.map(name=>getDocs(collection(fs,name))));
+  return snapshots.flatMap((snap,i)=>snap.docs.map(d=>({kind:collections[i],id:d.id,data:d.data()})));
+}
+async function migrateOperatorRecords(sources, target, cloud){
+  const plan = operatorRenamePlan(sources, target);
+  // Full names only: never infer a person from a surname or initials alone.
+  const names = new Set(sources.flatMap(operatorNames).map(normOp));
+  const conflict = cloud.find(o=>!o.deleted && !sources.some(s=>s.id===o.id) && o.id!==target.id && operatorNames(o).some(n=>names.has(normOp(n))));
+  if(conflict) throw Error("Un altro operatore usa lo stesso nominativo. Verifica prima l'anagrafica.");
+  let records = await loadOperatorMigrationData();
+  const affected = records.filter(r=>Object.keys(operatorDocumentPatch(r.data,r.kind,plan)).length);
+  const sourceLabels = new Set(sources.flatMap(operatorNames).map(normOp));
+  const targetLabels = new Set(operatorNames(target).map(normOp));
+  const countFor = labels => records.filter(r=>r.kind===COL_CHECKS && [r.data.meta?.prodottoDa,r.data.meta?.effettuatoDa].some(v=>labels.has(normOp(v)))).length;
+  const unionLabels = new Set([...sourceLabels,...targetLabels]);
+  const total = countFor(unionLabels);
+  if(!confirm(`Aggiornare i nominativi in "${plan.destination}"?\n\nControlli associati ai nomi di origine: ${countFor(sourceLabels)}\nControlli associati al destinatario: ${countFor(targetLabels)}\nTotale controlli distinti dopo l'unione: ${total}\nControlli da aggiornare: ${affected.filter(r=>r.kind===COL_CHECKS).length}\nBozze e riepiloghi da aggiornare: ${affected.filter(r=>r.kind!==COL_CHECKS).length}\n\nI valori delle prove, i lotti e le date restano conservati. Verrà scaricata una copia dei dati prima dell'aggiornamento.`)) return false;
+  downloadText(`backup_operatori_${Date.now()}.json`,JSON.stringify({version:6,createdAtISO:new Date().toISOString(),products:records.filter(r=>r.kind===COL_PRODUCTS).map(r=>({...r.data,code:r.id})),checks:records.filter(r=>r.kind===COL_CHECKS).map(r=>({...r.data,id:r.id})),draft_checks:records.filter(r=>r.kind===COL_DRAFTS).map(r=>({...r.data,id:r.id})),operators:cloud},null,2));
+  // Small transactions reread current data and only change operator fields.
+  // A failed operation leaves the source available, so it can be safely retried.
+  for(let i=0;i<affected.length;i+=100){
+    const group=affected.slice(i,i+100);
+    await runTransaction(fs,async transaction=>{
+      const current=await Promise.all(group.map(r=>transaction.get(doc(fs,r.kind,r.id))));
+      current.forEach((snapshot,index)=>{
+        if(!snapshot.exists()) return;
+        const patch=operatorDocumentPatch(snapshot.data(),group[index].kind,plan);
+        if(Object.keys(patch).length) transaction.update(doc(fs,group[index].kind,group[index].id),patch);
+      });
+    });
+    setDbStatusMessage(`DB: aggiornamento operatori ${Math.min(i+100,affected.length)}/${affected.length}`);
+  }
+  records=await loadOperatorMigrationData();
+  if(records.some(r=>Object.keys(operatorDocumentPatch(r.data,r.kind,plan)).length)){
+    throw Error("Sono presenti nuovi dati con il vecchio nome. Ripeti l'operazione per completarli.");
+  }
+  const merged={...target,deleted:false,aliases:[...new Set([...(target.aliases||[]),...sources.flatMap(operatorNames)])].filter(n=>normOp(n)!==normOp(plan.destination)),updatedAt:new Date().toISOString()};
+  await runTransaction(fs,async transaction=>{
+    transaction.set(doc(fs,COL_OPERATORS,merged.id),merged,{merge:true});
+    for(const source of sources){
+      if(source.id!==merged.id) transaction.set(doc(fs,COL_OPERATORS,source.id),{...source,deleted:true,mergedInto:merged.id,updatedAt:merged.updatedAt},{merge:true});
+    }
+  });
+  // Update this browser's drafts and any open form/detail as well.
+  const localDrafts=loadDraftChecksLocal().map(d=>({...d,meta:{...d.meta,prodottoDa:plan.rewrite(d.meta?.prodottoDa)||"",effettuatoDa:plan.rewrite(d.meta?.effettuatoDa)||""}}));
+  replaceDraftsCache(localDrafts);
+  for(const id of ["checkProdottoDa","checkEffettuatoDa"]){const el=document.getElementById(id);if(el)el.value=plan.rewrite(el.value);}
+  for(const record of [detailCheck,detailOriginal]){
+    if(record?.meta){record.meta.prodottoDa=plan.rewrite(record.meta.prodottoDa)||"";record.meta.effettuatoDa=plan.rewrite(record.meta.effettuatoDa)||"";}
+  }
+  invalidateAllProductsRowsCache();
+  window.__allProductsCache=[];
+  statsRangeCache.clear();
+  await syncOperatorsFromCloud();
+  await renderHomeRecentProducts();
+  await renderHomeDraftChecks();
+  if(selectedOperatorsRole) await openOperatorsRoleSection(selectedOperatorsRole);
+  resetOperatorForm();
+  alert(`Aggiornamento completato: ${plan.destination}.\nTotale verificato prima dell'aggiornamento: ${total} controlli distinti.\nNessun controllo eliminato.`);
+  return true;
+}
+async function saveOperatorWithHistory(){
+  try{
+    if(operatorsSyncPromise) await operatorsSyncPromise;
+    const fields={};
+    for(const [key,id] of Object.entries({role:"operatorRole",name:"opName",surname:"opSurname",code:"opCode"})) fields[key]=document.getElementById(id).value.trim();
+    if(Object.values(fields).some(v=>!v)) throw Error("Compila ruolo, nome, cognome e sigla.");
+    const editId=document.getElementById("opEditId").value.trim();
+    const cloud=await fetchOperatorsCloud();
+    const ops=normalizeOperators(loadOperators(),cloud);
+    const old=ops.find(o=>o.id===editId);
+    if(editId && !old) throw Error("Operatore non disponibile. Riapri l'elenco.");
+    const target={...(old||{}),...fields,id:old?.id||genId()};
+    const duplicate=ops.find(o=>o.id!==target.id && o.role===target.role && normOp(formatOperator(o))===normOp(formatOperator(target)));
+    if(old){
+      if(old.role!==target.role) throw Error("La modifica del ruolo non è prevista insieme alla correzione del nome. Mantieni il ruolo originale per conservare l'attribuzione delle firme.");
+      await migrateOperatorRecords([old],duplicate||target,cloud);
+    }else{
+      if(duplicate) throw Error("Operatore già presente.");
+      await upsertOperatorCloud(target);
+      await syncOperatorsFromCloud();
+      resetOperatorForm();
+      if(selectedOperatorsRole) await openOperatorsRoleSection(selectedOperatorsRole);
+      alert("Operatore salvato.");
+    }
+  }catch(error){console.error(error);alert("Aggiornamento non completato: "+error.message+"\nPuoi ripetere l'operazione; i controlli non vengono cancellati.");}
+}
+async function mergeFernandoOperators(){
+  try{
+    if(operatorsSyncPromise) await operatorsSyncPromise;
+    const cloud=await fetchOperatorsCloud();
+    const ops=normalizeOperators(loadOperators(),cloud);
+    const wrong=ops.filter(o=>normOp(o.name)==="fernando" && normOp(o.surname)==="saramento");
+    const correct=ops.filter(o=>normOp(o.name)==="fernando" && normOp(o.surname)==="sarmento");
+    if(!wrong.length && !correct.length) throw Error("Nessun operatore Fernando Saramento/Sarmento trovato.");
+    const roles=new Set([...wrong,...correct].map(o=>o.role));
+    if(roles.size!==1 || correct.length>1) throw Error("Ci sono più ruoli o più anagrafiche corrette. Apri Modifica sull'operatore da riunire e usa i dati dell'operatore di destinazione.");
+    const target=correct[0]||{...wrong[0],surname:"Sarmento"};
+    // Include the plain legacy name even if its operator entry was already removed.
+    const sources=wrong.length?wrong:[{...target,surname:"Saramento"}];
+    await migrateOperatorRecords(sources,target,cloud);
+  }catch(error){console.error(error);alert("Unione non completata: "+error.message+"\nPuoi ripetere l'operazione; nessun controllo viene eliminato.");}
+}
+
+function canonicalOperatorName(value){
+  const match=loadOperators().find(o=>(o.aliases||[]).some(a=>normOp(a)===normOp(value)));
+  return match ? formatOperator(match) : value;
 }
 
 /* =========================
