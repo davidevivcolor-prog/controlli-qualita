@@ -1038,8 +1038,17 @@ label.lottoLabel{color:#991b1b;font-size:16px;font-weight:900;letter-spacing:.5p
           </div>
         </div>
 
-        <div class="noteBox">Per riunire i controlli registrati con i due cognomi di Fernando, usa il pulsante qui sotto. Prima del salvataggio vedrai i conteggi effettivi.</div>
-<button id="mergeFernandoBtn" class="secondary" type="button">Unisci Saramento / Sarmento Fernando</button>
+        <div class="btns"><button id="mergeOperatorsBtn" class="secondary" type="button">Unisci operatori</button></div>
+<div id="mergeOperatorsPanel" class="controlCard hide">
+  <b>Unisci due operatori</b>
+  <p class="muted">Scegli il duplicato e l'operatore da mantenere. Controlli e firme saranno riuniti sotto il nome da mantenere.</p>
+  <div class="row2">
+    <div><label for="mergeSource">Operatore da unire (duplicato)</label><select id="mergeSource"></select></div>
+    <div><label for="mergeTarget">Operatore da mantenere</label><select id="mergeTarget"></select></div>
+  </div>
+  <p id="mergeOperatorsHint" class="muted" aria-live="polite"></p>
+  <div class="btns"><button id="mergeOperatorsConfirmBtn" class="primary" disabled>Verifica conteggi e unisci</button><button id="mergeOperatorsCancelBtn">Annulla</button></div>
+</div>
 <div id="operatorsRoleChooser" style="margin-top:12px">
           <div class="muted">Seleziona una sezione</div>
           <div class="operatorRoleGrid">
@@ -5110,7 +5119,11 @@ on("backToOperatorsBtn","click",()=>{ renderOperatorsList(selectedOperatorsRole)
 on("cancelEditOperatorBtn","click",()=>{ resetOperatorForm(); });
 
 on("saveOperatorBtn","click",()=> withButtonLoading("saveOperatorBtn", saveOperatorWithHistory, {loadingText:"Aggiornamento…"}));
-on("mergeFernandoBtn","click",()=> withButtonLoading("mergeFernandoBtn", mergeFernandoOperators, {loadingText:"Unione in corso…"}));
+on("mergeOperatorsBtn","click",openOperatorMerge);
+on("mergeSource","change",refreshOperatorMergeTargets);
+on("mergeTarget","change",updateOperatorMergeHint);
+on("mergeOperatorsCancelBtn","click",()=>document.getElementById("mergeOperatorsPanel").classList.add("hide"));
+on("mergeOperatorsConfirmBtn","click",mergeSelectedOperators);
 on("cancelEditOperatorBtn","click",resetOperatorForm);
 
 on("cancelCheckBtn","click",async ()=> loadProduct(currentCode));
@@ -5906,21 +5919,82 @@ async function saveOperatorWithHistory(){
     }
   }catch(error){console.error(error);alert("Aggiornamento non completato: "+error.message+"\nPuoi ripetere l'operazione; i controlli non vengono cancellati.");}
 }
-async function mergeFernandoOperators(){
+let operatorMergeOptions = [];
+let operatorMergeBusy = false;
+function fillOperatorMergeSelect(id, list){
+  const select=document.getElementById(id);
+  select.replaceChildren();
+  const empty=document.createElement('option');
+  empty.value=''; empty.textContent='Seleziona un operatore…'; select.appendChild(empty);
+  for(const operator of list){
+    const option=document.createElement('option');
+    option.value=operator.id;
+    option.textContent=`${formatOperator(operator)} — ${getRoleLabel(operator.role)}`;
+    select.appendChild(option);
+  }
+}
+async function openOperatorMerge(){
+  if(operatorMergeBusy) return;
+  try{
+    await syncOperatorsFromCloud();
+    operatorMergeOptions=loadOperators().sort((a,b)=>formatOperator(a).localeCompare(formatOperator(b),'it'));
+    fillOperatorMergeSelect('mergeSource',operatorMergeOptions);
+    refreshOperatorMergeTargets();
+    document.getElementById('mergeOperatorsPanel').classList.remove('hide');
+    document.getElementById('mergeSource').focus();
+  }catch(error){alert('Impossibile caricare gli operatori: '+error.message);}
+}
+function eligibleOperatorMergeTargets(operators, source){
+  return source ? operators.filter(o=>o.id!==source.id && o.role===source.role) : [];
+}
+function refreshOperatorMergeTargets(){
+  const source=operatorMergeOptions.find(o=>o.id===document.getElementById('mergeSource').value);
+  fillOperatorMergeSelect('mergeTarget',eligibleOperatorMergeTargets(operatorMergeOptions,source));
+  updateOperatorMergeHint();
+}
+function updateOperatorMergeHint(){
+  const source=operatorMergeOptions.find(o=>o.id===document.getElementById('mergeSource').value);
+  const target=operatorMergeOptions.find(o=>o.id===document.getElementById('mergeTarget').value);
+  document.getElementById('mergeOperatorsConfirmBtn').disabled=operatorMergeBusy || !source || !target;
+  document.getElementById('mergeOperatorsHint').textContent=source && target
+    ? `${formatOperator(source)} sarà tolto dall'elenco. I suoi controlli saranno attribuiti a ${formatOperator(target)}.`
+    : source && !eligibleOperatorMergeTargets(operatorMergeOptions,source).length
+      ? 'Non ci sono altri operatori dello stesso ruolo da mantenere.'
+      : 'Puoi unire due operatori dello stesso ruolo. Prima della conferma vedrai i conteggi.';
+}
+async function mergeSelectedOperators(){
+  if(operatorMergeBusy) return;
+  operatorMergeBusy=true;
+  const button=document.getElementById('mergeOperatorsConfirmBtn');
+  const sourceId=document.getElementById('mergeSource').value;
+  const targetId=document.getElementById('mergeTarget').value;
+  const lockIds=['mergeSource','mergeTarget','mergeOperatorsBtn','mergeOperatorsCancelBtn','saveOperatorBtn'];
+  const prior=lockIds.map(id=>[id,document.getElementById(id).disabled]);
+  prior.forEach(([id])=>document.getElementById(id).disabled=true);
+  button.disabled=true; button.textContent='Unione in corso…';
   try{
     if(operatorsSyncPromise) await operatorsSyncPromise;
     const cloud=await fetchOperatorsCloud();
     const ops=normalizeOperators(loadOperators(),cloud);
-    const wrong=ops.filter(o=>normOp(o.name)==="fernando" && normOp(o.surname)==="saramento");
-    const correct=ops.filter(o=>normOp(o.name)==="fernando" && normOp(o.surname)==="sarmento");
-    if(!wrong.length && !correct.length) throw Error("Nessun operatore Fernando Saramento/Sarmento trovato.");
-    const roles=new Set([...wrong,...correct].map(o=>o.role));
-    if(roles.size!==1 || correct.length>1) throw Error("Ci sono più ruoli o più anagrafiche corrette. Apri Modifica sull'operatore da riunire e usa i dati dell'operatore di destinazione.");
-    const target=correct[0]||{...wrong[0],surname:"Sarmento"};
-    // Include the plain legacy name even if its operator entry was already removed.
-    const sources=wrong.length?wrong:[{...target,surname:"Saramento"}];
-    await migrateOperatorRecords(sources,target,cloud);
-  }catch(error){console.error(error);alert("Unione non completata: "+error.message+"\nPuoi ripetere l'operazione; nessun controllo viene eliminato.");}
+    const source=ops.find(o=>o.id===sourceId),target=ops.find(o=>o.id===targetId);
+    if(!source || !target) throw Error('Seleziona due operatori ancora presenti in elenco. Riapri Unisci operatori per aggiornare le scelte.');
+    if(source.id===target.id) throw Error('Scegli due operatori diversi.');
+    if(source.role!==target.role) throw Error('Gli operatori devono avere lo stesso ruolo.');
+    if(await migrateOperatorRecords([source],target,cloud)){
+      document.getElementById('mergeOperatorsPanel').classList.add('hide');
+      operatorMergeOptions=[];
+      fillOperatorMergeSelect('mergeSource',[]);
+      fillOperatorMergeSelect('mergeTarget',[]);
+    }
+  }catch(error){
+    console.error(error);
+    alert('Unione non completata: '+error.message+'\nPuoi ripetere l’operazione; nessun controllo viene eliminato.');
+  }finally{
+    operatorMergeBusy=false;
+    prior.forEach(([id,disabled])=>document.getElementById(id).disabled=disabled);
+    button.textContent='Verifica conteggi e unisci';
+    updateOperatorMergeHint();
+  }
 }
 
 function canonicalOperatorName(value){
